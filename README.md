@@ -54,3 +54,15 @@ Prerequisites: Java 21, Maven 3.9+, and SQL Server 2022 or a compatible SQL Serv
 4. Run backend tests with `mvn -f BackEnd/pom.xml test`.
 
 The local SQL Server connection above trusts the local development certificate. Use a properly validated TLS certificate and environment-specific secrets outside development.
+
+## Google Cloud continuous deployment
+
+The root [cloudbuild.yaml](cloudbuild.yaml) runs backend verification, builds the static frontend preview, pushes it to Artifact Registry, and deploys it as a public Cloud Run service. This first deployment deliberately does not start the API or require database credentials, so you can get a Cloud Run URL before Cloud SQL is ready. Requests under `/api/` return an explicit `503` until the database-backed API is deployed.
+
+Before connecting a Cloud Build trigger to `main`:
+
+1. Enable the Cloud Build, Cloud Run, and Artifact Registry APIs in the Google Cloud project. Create the Artifact Registry Docker repository named `webdev-dockers` in `us-central1`, or change `_AR_REPOSITORY` in `cloudbuild.yaml` to match the repository you created.
+2. Grant the Cloud Build service account permission to push images to that repository and deploy Cloud Run services.
+3. Create a Cloud Build repository trigger for pushes to `main` and set `cloudbuild.yaml` as its build configuration. The trigger builds the frontend preview and deploys service `cei-pass`; the build must pass the backend test suite first.
+
+The Cloud Run URL serves the frontend preview only. Login, catalog, and other API-dependent features remain unavailable until the backend is deployed with a reachable Cloud SQL for SQL Server instance. This pipeline does not create the database or configure its network connection. Once the database is ready, configure Cloud SQL connectivity and grant the Cloud Run runtime service account access to database credentials in Secret Manager before deploying the combined frontend and backend. Registration remains disabled by default; set up and review privacy-notice configuration before enabling it. Google/Apple OAuth also needs provider credentials and the deployed callback URL before it can be enabled.

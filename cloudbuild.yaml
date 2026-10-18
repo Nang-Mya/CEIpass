@@ -1,0 +1,49 @@
+steps:
+  - name: "maven:3.9.9-eclipse-temurin-21"
+    entrypoint: "mvn"
+    args:
+      - "--batch-mode"
+      - "--no-transfer-progress"
+      - "--file"
+      - "BackEnd/pom.xml"
+      - "verify"
+
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "."
+
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:$COMMIT_SHA"
+
+  - name: "gcr.io/cloud-builders/gcloud"
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "${_SERVICE_NAME}"
+      - "--image"
+      - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:$COMMIT_SHA"
+      - "--region"
+      - "${_REGION}"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8080"
+
+images:
+  - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:$COMMIT_SHA"
+
+substitutions:
+  _PROJECT_ID: "winged-oath-511413-i8"
+  _REGION: "us-central1"
+  _AR_REPOSITORY: "cei-pass"
+  _SERVICE_NAME: "cei-pass"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
