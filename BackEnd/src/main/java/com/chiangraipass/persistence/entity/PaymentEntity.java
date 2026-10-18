@@ -41,4 +41,7 @@ public class PaymentEntity {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Column(name = "amount", nullable = false, precision = 10, scale = 2)
+    private Integer amount;
 }
