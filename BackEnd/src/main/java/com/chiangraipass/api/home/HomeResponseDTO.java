@@ -35,7 +35,7 @@ class BannerDTO {
 
 class PackageDTO {
     private Long id;
-    private String name; // รองรับ 1 วัน, 3 วัน, 5 วัน
+    private String name;
     private double price;
     private String description;
 
