@@ -16,3 +16,4 @@ Thumbs.db
 *.md
 !docs/
 !docs/*.md
+*.txt
