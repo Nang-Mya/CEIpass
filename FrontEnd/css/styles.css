@@ -1441,3 +1441,111 @@ input:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+/* --- ส่วนเพิ่มเติมสำหรับหน้า Home ของคุณ --- */
+.home-custom-container {
+    padding: 0.5rem 0 2rem 0;
+}
+
+.custom-banner {
+    width: 100%;
+    height: 160px;
+    background: linear-gradient(135deg, #426b43, #2b4a30);
+    border-radius: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+    text-align: center;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.custom-banner h2 {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.custom-banner p {
+    font-size: 0.75rem;
+    opacity: 0.85;
+}
+
+.banner-dots-custom {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 1.5rem;
+}
+
+.banner-dots-custom span {
+    width: 6px;
+    height: 6px;
+    background-color: #cbd5e1;
+    border-radius: 50%;
+}
+
+.banner-dots-custom span.active {
+    background-color: #475569;
+}
+
+.package-scroll-row {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    scroll-behavior: smooth;
+}
+
+.package-scroll-row::-webkit-scrollbar {
+    display: none;
+}
+
+.package-mini-card {
+    min-width: 140px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.85rem;
+    padding: 0.75rem;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.package-img-box {
+    width: 100%;
+    height: 70px;
+    background-color: #f1f5f9;
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.package-title {
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #1e293b;
+    margin-bottom: 0.25rem;
+}
+
+.package-footer-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+.package-price {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.btn-buy-mini {
+    background: #e2e8f0;
+    border: none;
+    padding: 0.25rem 0.6rem;
+    border-radius: 1rem;
+    font-size: 0.65rem;
+    font-weight: bold;
+    cursor: pointer;
+}

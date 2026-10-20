@@ -929,3 +929,82 @@ if ("serviceWorker" in navigator) {
 }
 
 render();
+// ฟังก์ชันสำหรับเรนเดอร์หน้า Home ใน app.js
+function homePage() {
+    return `
+        <div class="home-custom-container">
+            <!-- 1. แบนเนอร์ด้านบน (Banner & เกี่ยวกับ Chiang Rai Pass) -->
+            <div class="custom-banner">
+                <h2>Chiang Rai Pass</h2>
+                <p>Discover cultural landmarks and scenic attractions</p>
+            </div>
+            <div class="banner-dots-custom">
+                <span class="active"></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            <!-- 2. ส่วน Buy Pass (Quick Access - รองรับ 1 วัน, 3 วัน, 5 วัน) -->
+            <div class="section-block">
+                <div class="section-title-row">
+                    <h2>Buy Pass</h2>
+                    <a href="#buy" class="text-button">&rsaquo;</a>
+                </div>
+                <div class="package-scroll-row" id="home-packages">
+                    <div class="package-mini-card">
+                        <div class="package-img-box"></div>
+                        <div class="package-title">1-Day Pass</div>
+                        <div class="package-footer-row">
+                            <span class="package-price">499 ฿</span>
+                            <button class="btn-buy-mini" onclick="location.hash='#buy'">Buy</button>
+                        </div>
+                    </div>
+                    <div class="package-mini-card">
+                        <div class="package-img-box"></div>
+                        <div class="package-title">3-Day Pass</div>
+                        <div class="package-footer-row">
+                            <span class="package-price">1,200 ฿</span>
+                            <button class="btn-buy-mini" onclick="location.hash='#buy'">Buy</button>
+                        </div>
+                    </div>
+                    <div class="package-mini-card">
+                        <div class="package-img-box"></div>
+                        <div class="package-title">5-Day Pass</div>
+                        <div class="package-footer-row">
+                            <span class="package-price">1,800 ฿</span>
+                            <button class="btn-buy-mini" onclick="location.hash='#buy'">Buy</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. ส่วน Travel Recommendations (เลื่อนดูภายในส่วนนี้ ไม่เปลี่ยนหน้า) -->
+            <div class="section-block">
+                <div class="section-title-row">
+                    <h2>Travel Recommendations</h2>
+                    <span class="text-button">&rsaquo;</span>
+                </div>
+                <div class="attraction-list">
+                    <article class="attraction-card">
+                        <div class="attraction-art rose"><span>01</span></div>
+                        <div class="attraction-info">
+                            <p class="card-kicker">Place 1</p>
+                            <h3>White Temple</h3>
+                            <p>Iconic contemporary Buddhist temple architecture.</p>
+                            <span class="partner-label"><span class="partner-dot"></span> Verified</span>
+                        </div>
+                    </article>
+                    <article class="attraction-card">
+                        <div class="attraction-art ink"><span>02</span></div>
+                        <div class="attraction-info">
+                            <p class="card-kicker">Place 2</p>
+                            <h3>Big Buddha</h3>
+                            <p>Hilltop statue with panoramic city views.</p>
+                            <span class="partner-label"><span class="partner-dot"></span> Verified</span>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </div>
+    `;
+}
