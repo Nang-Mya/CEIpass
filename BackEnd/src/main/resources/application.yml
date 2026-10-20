@@ -19,7 +19,7 @@ spring:
     defer-datasource-initialization: true
   flyway:
     enabled: false
-  sql
+  sql:
     init:
       mode: always
       platform: h2
