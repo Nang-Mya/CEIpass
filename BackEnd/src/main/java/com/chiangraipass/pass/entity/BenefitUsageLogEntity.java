@@ -7,16 +7,24 @@ import com.chiangraipass.catalog.entity.AttractionCatalogEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "benefit_usage_log", schema = "app")
+@Table(name = "benefit_usage_log", schema = "app", indexes = {
+        @Index(name = "IX_benefit_usage_log_user_pass",
+                columnList = "user_pass_id, checkin_datetime DESC")
+})
 public class BenefitUsageLogEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "usage_id", nullable = false)
     private UUID usageId;
 
@@ -39,6 +47,13 @@ public class BenefitUsageLogEntity {
     private String validationStatus;
 
     public BenefitUsageLogEntity() {
+    }
+
+    @PrePersist
+    void onCreate() {
+        if (checkinDatetime == null) {
+            checkinDatetime = Instant.now();
+        }
     }
 
     public UUID getUsageId() {

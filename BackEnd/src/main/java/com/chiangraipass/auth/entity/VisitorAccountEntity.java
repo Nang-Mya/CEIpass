@@ -17,9 +17,13 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "visitor_account", schema = "app")
+@Table(name = "visitor_account", schema = "app", uniqueConstraints = {
+        @UniqueConstraint(name = "UQ_visitor_account_normalized_email", columnNames = "normalized_email"),
+        @UniqueConstraint(name = "UQ_visitor_account_security_token", columnNames = "security_token")
+})
 public class VisitorAccountEntity {
 
     private static final SecureRandom TOKEN_RANDOM = new SecureRandom();
@@ -152,6 +156,10 @@ public class VisitorAccountEntity {
 
     public String getPasswordHash() {
         return passwordHash;
+    }
+
+    public String getSecurityToken() {
+        return securityToken;
     }
 
     public Set<VisitorExternalIdentityEntity> getIdentities() {

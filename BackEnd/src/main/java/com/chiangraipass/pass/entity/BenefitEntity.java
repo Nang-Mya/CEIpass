@@ -11,6 +11,8 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 @Entity
@@ -33,10 +35,10 @@ public class BenefitEntity {
     private String benefitDetail;
 
     @Column(name = "discount_rate", nullable = false, precision = 5, scale = 2)
-    private BigDecimal discountRate;
+    private BigDecimal discountRate = BigDecimal.ZERO;
 
     @Column(name = "usage_rule_limit", nullable = false)
-    private int usageRuleLimit;
+    private int usageRuleLimit = 1;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -45,6 +47,20 @@ public class BenefitEntity {
     private Instant updatedAt;
 
     public BenefitEntity() {
+    }
+
+    @PrePersist
+    void onCreate() {
+        Instant now = Instant.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        updatedAt = now;
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = Instant.now();
     }
 
     public String getBenefitId() {

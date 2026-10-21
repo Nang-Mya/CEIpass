@@ -11,9 +11,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 @Entity
-@Table(name = "visitor_external_identity", schema = "app")
+@Table(name = "visitor_external_identity", schema = "app", uniqueConstraints = {
+        @UniqueConstraint(name = "UQ_visitor_external_identity_account_provider",
+                columnNames = { "account_id", "provider" })
+})
 @IdClass(VisitorExternalIdentityId.class)
 public class VisitorExternalIdentityEntity {
 
