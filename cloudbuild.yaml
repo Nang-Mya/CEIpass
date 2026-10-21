@@ -1,4 +1,5 @@
 steps:
+# Build the Java application using Maven
   - name: "maven:3.9.9-eclipse-temurin-21"
     entrypoint: "mvn"
     args:
@@ -6,8 +7,10 @@ steps:
       - "--no-transfer-progress"
       - "--file"
       - "BackEnd/pom.xml"
-      - "verify"
+      - "clean"
+      - "package"
 
+# Build the Docker image and push it to Artifact Registry (cloud run)
   - name: "gcr.io/cloud-builders/docker"
     args:
       - "build"
@@ -15,11 +18,13 @@ steps:
       - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:$COMMIT_SHA"
       - "."
 
+# Push the Docker image to Artifact Registry (cloud run)
   - name: "gcr.io/cloud-builders/docker"
     args:
       - "push"
       - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:$COMMIT_SHA"
 
+# Deploy the Docker image to Cloud Run
   - name: "gcr.io/cloud-builders/gcloud"
     entrypoint: "gcloud"
     args:
