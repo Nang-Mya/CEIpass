@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 import com.chiangraipass.catalog.dto.PassCatalogItem;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -40,9 +41,6 @@ public class PassCatalogEntity {
 
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
-
-    @Column(name = "duration_days")
-    private Integer durationDays;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -134,14 +132,6 @@ public class PassCatalogEntity {
 
     public void setDisplayOrder(int displayOrder) {
         this.displayOrder = displayOrder;
-    }
-
-    public Integer getDurationDays() {
-        return durationDays;
-    }
-
-    public void setDurationDays(Integer durationDays) {
-        this.durationDays = durationDays;
     }
 
     public Instant getCreatedAt() {
