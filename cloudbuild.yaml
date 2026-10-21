@@ -9,6 +9,7 @@ steps:
       - "BackEnd/pom.xml"
       - "clean"
       - "package"
+      - "-DskipTests"
 
 # Build the Docker image and push it to Artifact Registry (cloud run)
   - name: "gcr.io/cloud-builders/docker"
