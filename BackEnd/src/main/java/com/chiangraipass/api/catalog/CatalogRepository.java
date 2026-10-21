@@ -2,51 +2,34 @@ package com.chiangraipass.api.catalog;
 
 import java.util.List;
 
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.chiangraipass.persistence.entity.AttractionCatalogEntity;
+import com.chiangraipass.persistence.entity.PassCatalogEntity;
+import com.chiangraipass.persistence.repository.AttractionCatalogJpaRepository;
+import com.chiangraipass.persistence.repository.PassCatalogJpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class CatalogRepository {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final PassCatalogJpaRepository passes;
+    private final AttractionCatalogJpaRepository attractions;
 
-    public CatalogRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public CatalogRepository(
+            PassCatalogJpaRepository passes,
+            AttractionCatalogJpaRepository attractions) {
+        this.passes = passes;
+        this.attractions = attractions;
     }
 
     public List<PassCatalogItem> findPublishedPasses() {
-        return jdbcTemplate.query("""
-                SELECT pass_id, display_name, description, price_minor_units,
-                       currency, validity_description, is_available
-                FROM app.pass_catalog
-                WHERE is_published = 1
-                ORDER BY display_order, pass_id
-                """,
-                (result, rowNumber) -> new PassCatalogItem(
-                        result.getString("pass_id"),
-                        result.getString("display_name"),
-                        result.getString("description"),
-                        result.getLong("price_minor_units"),
-                        result.getString("currency"),
-                        result.getString("validity_description"),
-                        result.getBoolean("is_available")));
+        return passes.findByPublishedTrueOrderByDisplayOrderAscPassIdAsc().stream()
+                .map(PassCatalogEntity::toCatalogItem)
+                .toList();
     }
 
     public List<AttractionCatalogItem> findPublishedAttractions() {
-        return jdbcTemplate.query("""
-                SELECT partner_id, public_name, location, category, image_url,
-                       accessibility_information, is_pass_eligible
-                FROM app.attraction_catalog
-                WHERE is_published = 1
-                ORDER BY display_order, partner_id
-                """,
-                (result, rowNumber) -> new AttractionCatalogItem(
-                        result.getString("partner_id"),
-                        result.getString("public_name"),
-                        result.getString("location"),
-                        result.getString("category"),
-                        result.getString("image_url"),
-                        result.getString("accessibility_information"),
-                        result.getBoolean("is_pass_eligible")));
+        return attractions.findByPublishedTrueOrderByDisplayOrderAscPartnerIdAsc().stream()
+                .map(AttractionCatalogEntity::toCatalogItem)
+                .toList();
     }
 }

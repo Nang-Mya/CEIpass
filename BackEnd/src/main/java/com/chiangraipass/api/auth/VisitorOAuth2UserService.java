@@ -70,7 +70,7 @@ public class VisitorOAuth2UserService extends OidcUserService {
                     provider,
                     providerUser.getSubject(),
                     authProperties.privacy().noticeVersion());
-        } catch (org.springframework.dao.DuplicateKeyException error) {
+        } catch (org.springframework.dao.DataIntegrityViolationException error) {
             return accountRepository.findByExternalIdentity(provider, providerUser.getSubject())
                     .orElseThrow(() -> oauthError("The provider account could not be linked."));
         }

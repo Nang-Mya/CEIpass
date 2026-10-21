@@ -24,11 +24,11 @@ Chiang Rai Pass is a planned mobile-first web application for tourists. Its key 
 
 - **Front end:** plain HTML, CSS, and JavaScript in `FrontEnd/`; served as static files during development, with a PWA app-shell cache.
 - **Back end:** Java 21 and Spring Boot 3.5 in `BackEnd/`.
-- **Database:** Microsoft SQL Server; versioned Flyway migrations live in the backend classpath at `BackEnd/src/main/resources/db/migration/`.
+- **Database:** use JPA as a database have folder `entity` and `repository` live in the backend classpath at `BackEnd/src/main/java/com/chiangraipass/persistance/`.
 
 ## Run locally
 
-Prerequisites: Java 21, Maven 3.9+, and SQL Server 2022 or a compatible SQL Server instance.
+Prerequisites: Java 21, Maven 3.9+, and JAVA JPA and H2 to run database
 
 1. Create a development database using [Database/bootstrap.sql](Database/bootstrap.sql). For a local SQL Server install with `sqlcmd`:
 
