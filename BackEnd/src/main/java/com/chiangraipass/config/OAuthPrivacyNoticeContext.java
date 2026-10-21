@@ -12,13 +12,13 @@ public final class OAuthPrivacyNoticeContext {
         return NOTICE_VERSION.get();
     }
 
-    static Scope activate(String noticeVersion) {
+    public static Scope activate(String noticeVersion) {
         NOTICE_VERSION.set(noticeVersion);
         return NOTICE_VERSION::remove;
     }
 
     @FunctionalInterface
-    interface Scope extends AutoCloseable {
+    public interface Scope extends AutoCloseable {
         @Override
         void close();
     }

@@ -1,6 +1,5 @@
 package com.chiangraipass.config;
 
-import com.chiangraipass.api.auth.AuthProperties;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
