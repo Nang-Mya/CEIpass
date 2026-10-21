@@ -5,12 +5,11 @@ DELETE FROM app.attraction_catalog;
 -- ==========================================
 -- dummy data for table Pass Catalog
 -- ==========================================
-INSERT INTO app.pass_catalog (pass_id, display_name, description, price, currency, validity_description, is_available, is_published, display_order, duration_days, created_at, updated_at) 
+INSERT INTO app.pass_catalog (pass_id, display_name, description, price, currency, validity_description, is_available, is_published, display_order, created_at, updated_at) 
 VALUES
-('day-pass', 'Chiang Rai Day Pass', '1 day · Visit participating attractions', 299.00, 'THB', '1 day', true, true, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('three-day-pass', 'Explorer Pass', '3 days · More time to explore', 599.00, 'THB', '3 days', true, true, 2, 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-('family-pass', 'Family Pass', '1 day · For up to 4 visitors', 999.00, 'THB', '1 day', true, true, 3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-
+('day-pass', 'Chiang Rai Day Pass', 'Visit participating attractions', 299.00, 'THB', 'Per day', true, true, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('explorer-pass', 'Explorer Pass', 'More time to explore popular spots', 599.00, 'THB', 'Per day', true, true, 2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+('family-pass', 'Family Pass', 'For up to 4 visitors', 999.00, 'THB', 'Per day', true, true, 3, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 -- ==========================================
 -- dummy data for table Attraction Catalog
 -- ==========================================

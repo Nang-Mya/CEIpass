@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.chiangraipass.auth.entity.VisitorAccountEntity;
 import com.chiangraipass.catalog.entity.PassCatalogEntity;
 import com.chiangraipass.payment.entity.PaymentEntity;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -16,7 +17,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -40,7 +40,7 @@ public class UserPassEntity {
     @JoinColumn(name = "pass_id", nullable = false)
     private PassCatalogEntity pass;
 
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "payment_id", nullable = false)
     private PaymentEntity payment;
 
