@@ -701,6 +701,7 @@ function render() {
       break;
     default:
       appContent.innerHTML = homePage();
+      void loadHomeCatalogData();
   }
 }
 
@@ -929,82 +930,78 @@ if ("serviceWorker" in navigator) {
 }
 
 render();
-// ฟังก์ชันสำหรับเรนเดอร์หน้า Home ใน app.js
+
+function attractionCard(attraction, compact = false) {
+  const initials = attraction.name 
+    ? attraction.name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase() 
+    : "CR";
+
+  return `<article class="attraction-card${compact ? " attraction-card-compact" : ""}">
+    <div class="attraction-art leaf" aria-hidden="true"><span>${escapeHtml(initials)}</span></div>
+    <div class="attraction-info">
+      <p class="card-kicker">${escapeHtml(attraction.category || "")} · ${escapeHtml(attraction.location || "Chiang Rai")}</p>
+      <h3>${escapeHtml(attraction.name)}</h3>
+      ${compact ? "" : `<p>${escapeHtml(attraction.accessibilityInformation || "Pass partner attraction")}</p>`}
+      <span class="partner-label"><span class="partner-dot"></span>${attraction.eligibleForPass ? "Eligible for pass" : "Partner location"}</span>
+    </div>
+  </article>`;
+}
+
+
 function homePage() {
-    return `
-        <div class="home-custom-container">
-            <!-- 1. แบนเนอร์ด้านบน (Banner & เกี่ยวกับ Chiang Rai Pass) -->
-            <div class="custom-banner">
-                <h2>Chiang Rai Pass</h2>
-                <p>Discover cultural landmarks and scenic attractions</p>
-            </div>
-            <div class="banner-dots-custom">
-                <span class="active"></span>
-                <span></span>
-                <span></span>
-            </div>
+  const featured = attractions.map((attraction) => attractionCard(attraction, true)).join("");
+  return `<section class="home-page">
+    <div class="hero-card">
+      <div class="hero-copy">
+        <p class="eyebrow eyebrow-light">Your Chiang Rai adventure</p>
+        <h1>See more.<br>Worry less.</h1>
+        <p>One pass for the places you'll remember.</p>
+        <a class="button button-light" href="#buy">Explore passes <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="hero-sun" aria-hidden="true"></div>
+      <div class="hero-hills" aria-hidden="true"><span></span><span></span><span></span></div>
+      <span class="hero-stamp" aria-hidden="true">CHIANG<br>RAI · TH</span>
+    </div>
 
-            <!-- 2. ส่วน Buy Pass (Quick Access - รองรับ 1 วัน, 3 วัน, 5 วัน) -->
-            <div class="section-block">
-                <div class="section-title-row">
-                    <h2>Buy Pass</h2>
-                    <a href="#buy" class="text-button">&rsaquo;</a>
-                </div>
-                <div class="package-scroll-row" id="home-packages">
-                    <div class="package-mini-card">
-                        <div class="package-img-box"></div>
-                        <div class="package-title">1-Day Pass</div>
-                        <div class="package-footer-row">
-                            <span class="package-price">499 ฿</span>
-                            <button class="btn-buy-mini" onclick="location.hash='#buy'">Buy</button>
-                        </div>
-                    </div>
-                    <div class="package-mini-card">
-                        <div class="package-img-box"></div>
-                        <div class="package-title">3-Day Pass</div>
-                        <div class="package-footer-row">
-                            <span class="package-price">1,200 ฿</span>
-                            <button class="btn-buy-mini" onclick="location.hash='#buy'">Buy</button>
-                        </div>
-                    </div>
-                    <div class="package-mini-card">
-                        <div class="package-img-box"></div>
-                        <div class="package-title">5-Day Pass</div>
-                        <div class="package-footer-row">
-                            <span class="package-price">1,800 ฿</span>
-                            <button class="btn-buy-mini" onclick="location.hash='#buy'">Buy</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <section class="section-block quick-actions" aria-label="Quick access">
+      <a class="quick-card" href="#buy">
+        <span class="quick-icon quick-icon-green" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M4 5h16l-1.5 15h-13z"></path><path d="M9 9V7a3 3 0 0 1 6 0v2"></path></svg>
+        </span>
+        <span><strong>Buy a pass</strong><small>Find your way to more</small></span>
+        <span class="card-arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="quick-card" href="#qr">
+        <span class="quick-icon quick-icon-amber" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><path d="M14 14h3v3h-3zM20 14v2M14 20h2M19 19h2v2h-2z"></path></svg>
+        </span>
+        <span><strong>My QR pass</strong><small>Ready when you are</small></span>
+        <span class="card-arrow" aria-hidden="true">→</span>
+      </a>
+    </section>
 
-            <!-- 3. ส่วน Travel Recommendations (เลื่อนดูภายในส่วนนี้ ไม่เปลี่ยนหน้า) -->
-            <div class="section-block">
-                <div class="section-title-row">
-                    <h2>Travel Recommendations</h2>
-                    <span class="text-button">&rsaquo;</span>
-                </div>
-                <div class="attraction-list">
-                    <article class="attraction-card">
-                        <div class="attraction-art rose"><span>01</span></div>
-                        <div class="attraction-info">
-                            <p class="card-kicker">Place 1</p>
-                            <h3>White Temple</h3>
-                            <p>Iconic contemporary Buddhist temple architecture.</p>
-                            <span class="partner-label"><span class="partner-dot"></span> Verified</span>
-                        </div>
-                    </article>
-                    <article class="attraction-card">
-                        <div class="attraction-art ink"><span>02</span></div>
-                        <div class="attraction-info">
-                            <p class="card-kicker">Place 2</p>
-                            <h3>Big Buddha</h3>
-                            <p>Hilltop statue with panoramic city views.</p>
-                            <span class="partner-label"><span class="partner-dot"></span> Verified</span>
-                        </div>
-                    </article>
-                </div>
-            </div>
-        </div>
-    `;
+    <section class="section-block">
+      <div class="section-title-row">
+        <div><p class="eyebrow">Hand-picked for you</p><h2>Explore Chiang Rai</h2></div>
+        <span class="sample-pill">Sample partners</span>
+      </div>
+      <div class="attraction-list" id="home-attractions-container">${featured}</div>
+    </section>
+  </section>`;
+}
+
+
+async function loadHomeCatalogData() {
+  if (currentPage() !== "home") return;
+  try {
+    const data = await requestJson("/api/v1/catalog/attractions", { cache: "no-store" });
+    if (Array.isArray(data) && data.length > 0) {
+      const container = document.querySelector("#home-attractions-container");
+      if (container) {
+        container.innerHTML = data.map((item) => attractionCard(item, true)).join("");
+      }
+    }
+  } catch (error) {
+    console.debug("Using static fallback attractions as backend catalog API is not reached.", error);
+  }
 }
