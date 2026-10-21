@@ -12,7 +12,7 @@ This feature adds the five requested mobile-first screens and navigable bottom b
 | History | Loading, empty, and unavailable states; renders a validated history response. | Authenticated, paginated, server-owned usage records and retention/privacy rules. |
 | Profile | Email/password account creation and session sign-in; optional Google/Apple OAuth; current account display and sign-out; published-notice acknowledgement before registration. | Provider credentials/callback setup, email verification and recovery, rate limiting, privacy rights, and authoritative consent-management APIs. |
 
-The backend provides SQL-backed public catalog endpoints and server-side session authentication. The catalog tables start empty and unpublished; no sample pass or partner is seeded or presented as real inventory. New account registration is disabled unless the operator enables it and configures a reviewed privacy notice/version. Google and Apple sign-in require provider credentials. Payment, redemption, and order flows are not implemented. The frontend still renders clearly labeled sample catalog listings and does not yet consume the catalog endpoints. Do not treat the browser's cart or cached QR data as authoritative.
+The backend provides JPA-backed public catalog endpoints and server-side session authentication. By default it uses an in-memory H2 database with Hibernate schema generation; catalog data starts empty and unpublished, and no sample pass or partner is seeded or presented as real inventory. New account registration is disabled unless the operator enables it and configures a reviewed privacy notice/version. Google and Apple sign-in require provider credentials. Payment, redemption, and order flows are not implemented. The frontend still renders clearly labeled sample catalog listings and does not yet consume the catalog endpoints. Do not treat the browser's cart or cached QR data as authoritative.
 
 ## Navigation and usability
 
@@ -43,10 +43,10 @@ Catalog endpoints below are implemented. Other endpoints remain proposed contrac
 
 ### Public catalog
 
-- `GET /api/v1/catalog/passes` returns published pass IDs, display names, descriptions, price in integer minor units, currency, validity description, and availability. Unpublished passes are not returned; a published but temporarily unavailable pass is returned with `available: false`.
-- `GET /api/v1/catalog/attractions` returns published partner ID, public name, location, category, approved image URL, accessibility information, and current pass eligibility.
+- `GET /api/v1/catalog/passes` returns published pass IDs, display names, descriptions, decimal `price` (`BigDecimal` in Java, serialized as a JSON number), currency, validity description, and availability. Unpublished passes are not returned; a published but temporarily unavailable pass is returned with `available: false`.
+- `GET /api/v1/catalog/attractions` returns published partner ID, public name, description, location, category, approved image URL, accessibility information, and current pass eligibility.
 - The API response is authoritative for price and availability; never accept client-supplied totals as payment amounts.
-- `BackEnd/src/main/resources/db/migration/V2__create_public_catalog.sql` creates the backing SQL Server tables. Records are unpublished by default; an approved catalog-management process must populate and publish real partner/pass data before the endpoints return listings.
+- Hibernate creates the catalog tables from the JPA entities in the default local H2 configuration. There is currently no catalog-management API or seed data, so records must be populated through a separately authorized process before these endpoints return listings. A production database and schema migration strategy have not yet been selected.
 
 ### Orders and payment
 

@@ -3,10 +3,10 @@ package com.chiangraipass.config;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import com.chiangraipass.api.auth.AuthProperties;
-import com.chiangraipass.api.auth.VisitorIdentity;
-import com.chiangraipass.api.auth.VisitorUserDetailsService;
-import com.chiangraipass.api.auth.VisitorOAuth2UserService;
+import com.chiangraipass.auth.model.VisitorIdentity;
+import com.chiangraipass.auth.service.VisitorOAuth2UserService;
+import com.chiangraipass.auth.service.VisitorUserDetailsService;
+import com.chiangraipass.config.AuthProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.ObjectProvider;

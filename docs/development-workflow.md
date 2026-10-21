@@ -47,7 +47,7 @@ Treat the items below as independently reviewable feature branches. Adjust order
 
 | Phase | Example branch | Scope and exit evidence |
 |---|---|---|
-| 1. Project foundation | `feature/project-foundation` | Scaffolded: plain HTML/CSS/JavaScript UI, Java 21/Spring Boot API, SQL Server/Flyway baseline, local setup instructions, health endpoint, and backend CI. Before completion, verify a clean build/test and local database startup. |
+| 1. Project foundation | `feature/project-foundation` | Scaffolded: plain HTML/CSS/JavaScript UI, Java 21/Spring Boot API, in-memory H2 development database, local setup instructions, health endpoint, and backend CI. A persistent production database and migration strategy remain to be selected. |
 | 2. API and data contracts | `feature/payment-and-qr-contracts` | Define API shapes, payment/QR states, schema migrations, currency precision, partner split and rounding rules. Review contracts before provider or UI flows depend on them. |
 | 3. Transaction-safe redemption | `feature/qr-redemption` | Implement QR issuance/expiry and atomic one-time redemption. A concurrency test proves no more than one competing request succeeds. |
 | 4. Payment provider | `feature/payment-integration` | Add server-side checkout/provider adapter, payment state transitions, and provider sandbox tests. Client state alone cannot mark a payment paid. |
@@ -60,7 +60,7 @@ Treat the items below as independently reviewable feature branches. Adjust order
 ## Branch dependency guidance
 
 - Agree on API contracts and state transitions before parallel front-end/back-end implementation.
-- Land database migrations and backend behavior behind compatible interfaces before relying on them in the UI.
+- When a production database and migration tool are selected, land compatible migrations and backend behavior before relying on them in the UI.
 - Keep webhook processing independent from browser redirect handling; the backend must remain authoritative.
-- Coordinate changes to shared contracts and migrations in PR descriptions. Avoid parallel incompatible migrations against the same schema.
+- Coordinate changes to shared contracts and any future migrations in PR descriptions. Avoid parallel incompatible migrations against the same schema.
 - The offline cache branch depends on a documented offline policy; it must not invent offline redemption guarantees.

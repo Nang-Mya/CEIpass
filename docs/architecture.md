@@ -2,7 +2,7 @@
 
 ## Purpose and status
 
-This document translates the product requirements into an initial architecture. The repository foundation now uses plain HTML/CSS/JavaScript for the static visitor UI, Java 21 with Spring Boot 3.5 for the REST API, and Microsoft SQL Server with Flyway migrations. Public catalog read endpoints and server-side email/password session authentication are implemented; the catalog tables require approved records, and Google/Apple OAuth require provider credentials. Payment, history, QR issuance/redemption, and live frontend catalog integration remain future work.
+This document translates the product requirements into an initial architecture. The repository uses plain HTML/CSS/JavaScript for the static visitor UI and Java 21 with Spring Boot 3.5 for the REST API. The backend currently defaults to in-memory H2 with Hibernate schema generation; Flyway is disabled, and no persistent production database or migration strategy has been configured. Public catalog read endpoints and server-side email/password session authentication are implemented; the catalog starts empty, and Google/Apple OAuth require provider credentials. Payment, history, QR issuance/redemption, and live frontend catalog integration remain future work.
 
 ## Product requirements and measurable outcomes
 
@@ -52,15 +52,13 @@ This is a logical separation, not a requirement to deploy each box as a separate
 
 ### Offline redemption constraint
 
-Offline access can support app startup and display of previously authorized, unexpired information. It cannot by itself guarantee global one-time redemption across disconnected venues or scanners. Two isolated scanners cannot know that the other has already accepted the same code.
-
-For strict double-scan prevention, redemption must be authorized by a shared online authority or a deliberately designed trusted local/edge authority. If offline acceptance is a product requirement, define its trust model, credential lifetime, scanner synchronization, replay handling, and reconciliation behavior before implementation. Until that design exists, show offline status and do not represent an unconfirmed redemption as successful.
+The current product direction allows venues to accept offline QR codes and reconcile later, with temporary duplicate-redemption risk explicitly accepted. Offline access cannot guarantee global one-time redemption across disconnected venues or scanners: two isolated scanners cannot know that the other has already accepted the same code. Preserve offline acceptance records and surface duplicate conflicts for review during synchronization; do not silently overwrite or claim a global one-time guarantee. The scanner trust model, credential lifetime, and synchronization rules still need implementation and validation.
 
 ## Back-end and API boundaries
 
 Keep these responsibilities explicit, whether they are separate modules or services:
 
-- **Public catalog:** expose only published partner and pass information. Keep prices in integer minor units and return availability explicitly. Catalog reads are public; catalog editing and publication require a separately authorized management process.
+- **Public catalog:** expose only published partner and pass information. The implemented catalog response represents prices as decimal `BigDecimal` values and returns availability explicitly. Catalog reads are public; catalog editing and publication require a separately authorized management process.
 - **Pass and QR:** issue credentials, check ownership and validity, and perform single-use redemption.
 - **Checkout and payment:** create provider payment requests and track provider-backed payment state.
 - **Webhook intake:** verify and durably record provider events, then hand them to idempotent processing.
@@ -90,7 +88,7 @@ The exact acknowledgement timing, retry policy, and response codes should follow
 - Back the redemption condition with a database uniqueness or equivalent invariant where appropriate. Do not use “read, then later write” as the only concurrency safeguard.
 - In the same transaction, persist the successful redemption and its audit record. Define safe behavior for a client retry after a timeout when the first request may already have committed.
 - Enforce uniqueness for provider event IDs and relevant idempotency keys.
-- Store money as integer minor units (or an equally precise representation supported by the chosen currency model). Document partner split rules, rounding, adjustments, refunds, and settlement reconciliation.
+- The catalog API and JPA entities currently represent prices as decimal `BigDecimal` values. Define the production currency/precision and rounding policy consistently across catalog, payment-provider amounts, refunds, and partner settlement; never use binary floating-point for money.
 - Preserve an immutable or append-only audit trail for financial events and partner allocations. Corrections should be represented as explicit adjustment entries rather than silently rewriting history.
 
 ## Security and reliability checklist
@@ -106,6 +104,8 @@ The exact acknowledgement timing, retry policy, and response codes should follow
 
 ## Current repository layout
 
+The Java application is organized by feature under `BackEnd/src/main/java/com/chiangraipass`, with shared application configuration in `config`. See [Backend package structure](../structure.md) for the complete package tree. The test sources follow the same feature layout.
+
 ```text
 FrontEnd/
   index.html
@@ -116,22 +116,25 @@ FrontEnd/
   icons/
 BackEnd/
   pom.xml
-  src/main/java/        # Spring Boot application and versioned API
+  src/main/java/com/chiangraipass/
+    auth/               # session authentication, accounts, OIDC
+    catalog/            # public passes and attractions
+    pass/               # pass and benefit persistence models
+    payment/            # payment persistence model
+    health/             # health endpoint
+    config/             # shared security, OAuth, CORS configuration
   src/main/resources/
-    application.yml
-    db/migration/       # Flyway SQL migrations
+    application.yml     # in-memory H2 defaults; Flyway disabled
   src/test/java/
-Database/
-  bootstrap.sql         # creates the local development database
 docs/
   architecture.md
   development-workflow.md
   visitor-app-feature.md
 ```
 
-The Flyway migration files are stored in the backend classpath so they work consistently when running from source or a packaged application. `Database/` contains database bootstrap material and can hold SQL Server-specific operational scripts. Keep modules deployable together until operational requirements justify splitting them. Avoid duplicating payment or redemption state across independent services without a clear ownership and consistency model.
+There are currently no checked-in SQL migrations or database bootstrap scripts. Hibernate creates the schema in the local H2 database. Select a persistent production database, migration tool, backup/recovery process, and deployment configuration before treating accounts or catalog data as durable. Keep modules deployable together until operational requirements justify splitting them. Avoid duplicating payment or redemption state across independent services without a clear ownership and consistency model.
 
-The static visitor UI currently includes Home, Buy, My QR, History, and Profile screens. Pass/attraction cards and the cart are clearly labeled local preview data. The app shell is cached by the service worker, while the short-lived QR payload is stored separately in IndexedDB only after an authenticated QR API exists. API response data is not cached by the service worker.
+The static visitor UI currently includes Home, Buy, My QR, History, and Profile screens. Pass/attraction cards and the cart are clearly labeled local preview data. The app shell is cached by the service worker; API responses are not cached by it. The QR and history screens may call their planned API routes, but issuance, redemption, and history APIs are not implemented.
 
 ## Decisions to make before business-feature implementation
 
@@ -139,9 +142,9 @@ Record the decisions and rationale in pull requests or a lightweight architectur
 
 - Supported browser/device targets and how the static front end will be served in each environment.
 - Hosting, deployment environments, API domain, and observability approach.
-- SQL Server hosting/edition and the transaction/isolation behavior relied on for conditional redemption.
+- Production database hosting, migration strategy, and the transaction/isolation behavior relied on for conditional redemption.
 - Payment provider(s), signature verification contract, idempotency support, refund flow, and sandbox process.
-- Whether venue redemption requires connectivity; if not, the trusted offline authorization and reconciliation design.
+- Trusted offline scanner authorization, credential lifetime, and reconciliation design for the accepted temporary duplicate-redemption risk.
 - Pass/QR validity period, renewal behavior, visitor identity model, and privacy/retention requirements.
 - Partner split formula, rounding, refunds/chargebacks, settlement schedule, and reconciliation owner.
 - Definition of the under-one-second QR metric, percentile, device profiles, and network test conditions.

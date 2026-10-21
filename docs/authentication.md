@@ -2,9 +2,9 @@
 
 The API supports email/password accounts and optional Google and Apple OpenID Connect sign-in. Authentication uses a server-side Spring Security session; the browser receives an HTTP-only `JSESSIONID` cookie. Passwords are stored as BCrypt hashes and unsafe requests require a CSRF token.
 
-## Database
+## Local database
 
-Flyway migration `V3__create_visitor_accounts.sql` creates visitor accounts and external provider identities. Start the API with the existing SQL Server settings so Flyway can apply the migration.
+The backend currently uses an in-memory H2 database by default. Spring Data JPA repositories persist accounts for the lifetime of the running process, and Hibernate generates/updates the schema (`spring.jpa.hibernate.ddl-auto: update`). Flyway is disabled and there are no checked-in backend schema migrations. Local accounts are lost when the API stops. Choose and configure a persistent production database and migration strategy before using this authentication service for production accounts.
 
 ## Registration and privacy notice
 
