@@ -1,6 +1,6 @@
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY BackEnd/target/*.jar app.jar
+COPY BackEnd/target/cei-pass-api-*.jar app.jar
 ENV PORT=8080
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
