@@ -14,9 +14,9 @@ const passes = [
 ];
 
 const attractions = [
-  { name: "Wat Rong Khun", category: "Temple · Mueang Chiang Rai", initials: "WR", tone: "rose", description: "Discover the striking White Temple and its detailed contemporary artwork." },
-  { name: "Baan Dam Museum", category: "Museum · Nang Lae", initials: "BD", tone: "ink", description: "Explore the distinctive art and architecture of the Black House Museum." },
-  { name: "Singha Park", category: "Nature · Mae Kon", initials: "SP", tone: "leaf", description: "Take in open landscapes, gardens, and outdoor activities in Chiang Rai." }
+  { name: "Wat Rong Khun", category: "Temple · Mueang Chiang Rai", initials: "WR", tone: "rose", description: "Discover the striking White Temple and its detailed contemporary artwork.", image: "./images/wat-rong-khun.jpg" },
+  { name: "Baan Dam Museum", category: "Museum · Nang Lae", initials: "BD", tone: "ink", description: "Explore the distinctive art and architecture of the Black House Museum.", image: "./images/baan-dam.jpg" },
+  { name: "Singha Park", category: "Nature · Mae Kon", initials: "SP", tone: "leaf", description: "Take in open landscapes, gardens, and outdoor activities in Chiang Rai.", image: "./images/singha-park.jpg" }
 ];
 
 const appContent = document.querySelector("#app-content");
@@ -115,8 +115,12 @@ function pageHeading(eyebrow, title, description = "") {
 }
 
 function attractionCard(attraction, compact = false) {
+  const mediaContent = attraction.image
+    ? `<img src="${attraction.image}" alt="${escapeHtml(attraction.name)}" class="attraction-image" loading="lazy">`
+    : `<span>${attraction.initials}</span>`;
+
   return `<article class="attraction-card${compact ? " attraction-card-compact" : ""}">
-    <div class="attraction-art ${attraction.tone}" aria-hidden="true"><span>${attraction.initials}</span></div>
+    <div class="attraction-art ${attraction.tone}" aria-hidden="true">${mediaContent}</div>
     <div class="attraction-info">
       <p class="card-kicker">${attraction.category}</p>
       <h3>${attraction.name}</h3>
@@ -701,7 +705,7 @@ function render() {
       break;
     default:
       appContent.innerHTML = homePage();
-      void loadHomeCatalogData();
+      
   }
 }
 
@@ -931,77 +935,3 @@ if ("serviceWorker" in navigator) {
 
 render();
 
-function attractionCard(attraction, compact = false) {
-  const initials = attraction.name 
-    ? attraction.name.split(" ").map(w => w[0]).join("").substring(0, 2).toUpperCase() 
-    : "CR";
-
-  return `<article class="attraction-card${compact ? " attraction-card-compact" : ""}">
-    <div class="attraction-art leaf" aria-hidden="true"><span>${escapeHtml(initials)}</span></div>
-    <div class="attraction-info">
-      <p class="card-kicker">${escapeHtml(attraction.category || "")} · ${escapeHtml(attraction.location || "Chiang Rai")}</p>
-      <h3>${escapeHtml(attraction.name)}</h3>
-      ${compact ? "" : `<p>${escapeHtml(attraction.accessibilityInformation || "Pass partner attraction")}</p>`}
-      <span class="partner-label"><span class="partner-dot"></span>${attraction.eligibleForPass ? "Eligible for pass" : "Partner location"}</span>
-    </div>
-  </article>`;
-}
-
-
-function homePage() {
-  const featured = attractions.map((attraction) => attractionCard(attraction, true)).join("");
-  return `<section class="home-page">
-    <div class="hero-card">
-      <div class="hero-copy">
-        <p class="eyebrow eyebrow-light">Your Chiang Rai adventure</p>
-        <h1>See more.<br>Worry less.</h1>
-        <p>One pass for the places you'll remember.</p>
-        <a class="button button-light" href="#buy">Explore passes <span aria-hidden="true">→</span></a>
-      </div>
-      <div class="hero-sun" aria-hidden="true"></div>
-      <div class="hero-hills" aria-hidden="true"><span></span><span></span><span></span></div>
-      <span class="hero-stamp" aria-hidden="true">CHIANG<br>RAI · TH</span>
-    </div>
-
-    <section class="section-block quick-actions" aria-label="Quick access">
-      <a class="quick-card" href="#buy">
-        <span class="quick-icon quick-icon-green" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M4 5h16l-1.5 15h-13z"></path><path d="M9 9V7a3 3 0 0 1 6 0v2"></path></svg>
-        </span>
-        <span><strong>Buy a pass</strong><small>Find your way to more</small></span>
-        <span class="card-arrow" aria-hidden="true">→</span>
-      </a>
-      <a class="quick-card" href="#qr">
-        <span class="quick-icon quick-icon-amber" aria-hidden="true">
-          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><path d="M14 14h3v3h-3zM20 14v2M14 20h2M19 19h2v2h-2z"></path></svg>
-        </span>
-        <span><strong>My QR pass</strong><small>Ready when you are</small></span>
-        <span class="card-arrow" aria-hidden="true">→</span>
-      </a>
-    </section>
-
-    <section class="section-block">
-      <div class="section-title-row">
-        <div><p class="eyebrow">Hand-picked for you</p><h2>Explore Chiang Rai</h2></div>
-        <span class="sample-pill">Sample partners</span>
-      </div>
-      <div class="attraction-list" id="home-attractions-container">${featured}</div>
-    </section>
-  </section>`;
-}
-
-
-async function loadHomeCatalogData() {
-  if (currentPage() !== "home") return;
-  try {
-    const data = await requestJson("/api/v1/catalog/attractions", { cache: "no-store" });
-    if (Array.isArray(data) && data.length > 0) {
-      const container = document.querySelector("#home-attractions-container");
-      if (container) {
-        container.innerHTML = data.map((item) => attractionCard(item, true)).join("");
-      }
-    }
-  } catch (error) {
-    console.debug("Using static fallback attractions as backend catalog API is not reached.", error);
-  }
-}
