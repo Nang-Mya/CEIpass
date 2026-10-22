@@ -7,6 +7,8 @@ import com.chiangraipass.auth.entity.VisitorAccountEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 
 public interface VisitorAccountJpaRepository extends JpaRepository<VisitorAccountEntity, UUID> {
 
@@ -23,4 +25,13 @@ public interface VisitorAccountJpaRepository extends JpaRepository<VisitorAccoun
     Optional<VisitorAccountEntity> findActiveByProviderIdentity(
             @Param("provider") String provider,
             @Param("subject") String subject);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT account
+            FROM VisitorAccountEntity account
+            WHERE account.normalizedEmail = :email
+              AND account.accountStatus = 'ACTIVE'
+            """)
+    Optional<VisitorAccountEntity> findActiveForUpdate(@Param("email") String email);
 }

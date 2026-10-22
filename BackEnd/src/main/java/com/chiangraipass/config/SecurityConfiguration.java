@@ -5,14 +5,17 @@ import java.util.Map;
 
 import com.chiangraipass.auth.model.VisitorIdentity;
 import com.chiangraipass.auth.service.VisitorOAuth2UserService;
+import com.chiangraipass.auth.service.LoginAttemptService;
 import com.chiangraipass.auth.service.VisitorUserDetailsService;
 import com.chiangraipass.config.AuthProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
+import java.time.Clock;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
@@ -30,6 +33,9 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.authentication.LockedException;
+
 
 @Configuration
 @EnableConfigurationProperties(AuthProperties.class)
@@ -65,7 +71,7 @@ public class SecurityConfiguration {
             ObjectMapper objectMapper,
             AuthProperties authProperties,
             VisitorOAuth2UserService oauthUserService,
-            ObjectProvider<ClientRegistrationRepository> registrations) throws Exception {
+            ObjectProvider<ClientRegistrationRepository> registrations) throws Exception { {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf
@@ -102,6 +108,9 @@ public class SecurityConfiguration {
                         .deleteCookies("JSESSIONID")
                         .logoutSuccessHandler((request, response, authentication) ->
                                 response.setStatus(HttpServletResponse.SC_NO_CONTENT)));
+        http.addFilterBefore(
+                new RateLimitFilter(objectMapper, RateLimitFilter.defaultRules(), Clock.systemUTC()),
+                CsrfFilter.class);
 
         if (registrations.getIfAvailable() != null) {
             http.oauth2Login(oauth -> oauth
@@ -111,6 +120,7 @@ public class SecurityConfiguration {
             http.addFilterBefore(new OAuthPrivacyNoticeFilter(), OAuth2LoginAuthenticationFilter.class);
         }
         return http.build();
+        }
     }
 
     private AuthenticationEntryPoint apiUnauthorized(ObjectMapper mapper) {
@@ -132,11 +142,19 @@ public class SecurityConfiguration {
 
     private AuthenticationFailureHandler jsonLoginFailure(ObjectMapper mapper) {
         return (request, response, exception) -> {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            // The account locks when the 5th wrong password is recorded; from the next attempt
+            // Spring Security rejects it with LockedException before checking the password.
+            boolean locked = exception instanceof LockedException;
+            response.setStatus(locked ? HttpStatus.LOCKED.value() : HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setHeader("Cache-Control", "no-store");
-            mapper.writeValue(response.getOutputStream(), Map.of("message", "Invalid email or password."));
+            String message = locked
+                    ? "Too many failed attempts. The account is locked for "
+                            + LoginAttemptService.LOCK_DURATION.toMinutes() + " minutes. Try again later."
+                    : "Invalid email or password.";
+            mapper.writeValue(response.getOutputStream(), Map.of("message", message));
         };
+    
     }
 
     private AuthenticationSuccessHandler oauthSuccess(AuthProperties properties) {

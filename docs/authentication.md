@@ -16,6 +16,11 @@ New-account registration is disabled by default. Enable it only after publishing
 
 The API reports registration as available only when the explicit enable flag is true and both notice settings are valid. The registration form requires acknowledgement of that notice; it does not collect marketing consent. Existing accounts may still sign in while registration is disabled.
 
+## Password rules
+
+New passwords must have at least 8 characters (at most 72), at least 1 number, at least 1 special character, and only English letters, numbers and symbols. Spaces are allowed but do not count as special characters. The rules are enforced by `PasswordPolicy` on the server and mirrored in the browser for faster feedback; the server response lists every unmet rule.
+
+- **Sign-in messages:** the first five wrong passwords (and any unknown email) return the same `Invalid email or password.` message. The fifth wrong password locks the account; from the next attempt the response (`423`) says it is locked for 10 minutes, even if the password is then correct. This reveals that the email has an account, but only after five failed attempts on it.
 ## Google
 
 Create an OAuth 2.0 web client and configure:

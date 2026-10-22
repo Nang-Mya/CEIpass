@@ -320,6 +320,7 @@ function profilePage(authState) {
       ${reg ? `<label class="field-label">Full name</label><input name="fullName" required>` : ""}
       <label class="field-label">Email</label><input name="email" type="email" required>
       <label class="field-label">Password</label><input name="password" type="password" required>
+      ${reg ? `<small>At least 8 characters, with at least 1 number and 1 special character (! @ # $ %). English letters only.</small>` : ""}
       ${reg ? `<div class="consent-box"><label class="check-row"><input type="checkbox" name="privacyNoticeAcknowledged" required><span>I acknowledge the Privacy Notice.</span></label></div>` : ""}
       <button type="submit" class="button button-dark button-full">${reg ? "Create account" : "Sign in"} →</button><p id="account-message" class="form-message">${escapeHtml(authState.notice || authState.error)}</p>
     </form></div></section>`;
@@ -407,11 +408,22 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+function passwordProblem(password) {
+  const unmet = [];
+  if (password.length < 8) unmet.push("at least 8 characters");
+  if (password.length > 72) unmet.push("at most 72 characters");
+  if (!/[0-9]/.test(password)) unmet.push("at least 1 number");
+  if (!/[!-\/:-@\[-`{-~]/.test(password)) unmet.push("at least 1 special character (for example ! @ # $ %)");
+  if (/[^\x20-\x7E]/.test(password)) unmet.push("only English letters, numbers and symbols (no Thai or other languages)");
+  return unmet.length ? `Password must have: ${unmet.join("; ")}.` : "";
+}
+
 document.addEventListener("submit", async (event) => {
   if (event.target.id !== "account-form") return;
   event.preventDefault(); const form = event.target; const msg = form.querySelector("#account-message");
   if (!form.reportValidity()) return;
   if (profileMode === "register" && !form.elements.privacyNoticeAcknowledged.checked) { msg.textContent = "Please acknowledge the Privacy Notice."; return; }
+  if (profileMode === "register") { const problem = passwordProblem(form.elements.password.value); if (problem) { msg.textContent = problem; return; } }
   const btn = form.querySelector('[type="submit"]'); btn.disabled = true; msg.textContent = "Processing...";
   try {
     const csrf = await csrfHeaders();
@@ -420,7 +432,12 @@ document.addEventListener("submit", async (event) => {
       profileMode = "login"; profileFeedback = "Account created. Sign in."; await renderProfilePage(); return;
     }
     const res = await fetch(apiUrl("/api/v1/auth/login"), { method: "POST", headers: { ...csrf, Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ email: form.elements.email.value.trim(), password: form.elements.password.value }), credentials: "include" });
-    if (!res.ok) throw new Error("Check email and password.");
+      if (!res.ok) {
+      let reason = "Sign in failed. Please try again.";
+      try { const body = await res.json(); if (typeof body.message === "string") reason = body.message; } catch (e) {}
+      throw new Error(reason);
+    }
+
     const account = await res.json(); profileFeedback = await clearQrForAccountSwitch(account.accountId) || "Signed in."; profileMode = "login"; window.location.hash = "#profile"; await renderProfilePage();
   } catch (e) { msg.textContent = e.message; } finally { btn.disabled = false; }
 });

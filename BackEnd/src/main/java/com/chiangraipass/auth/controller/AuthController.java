@@ -9,6 +9,7 @@ import com.chiangraipass.auth.dto.AuthConfiguration;
 import com.chiangraipass.auth.dto.OAuthPreparationRequest;
 import com.chiangraipass.auth.dto.RegistrationRequest;
 import com.chiangraipass.auth.model.VisitorIdentity;
+import com.chiangraipass.auth.service.PasswordPolicy;
 import com.chiangraipass.auth.service.VisitorAccountService;
 import com.chiangraipass.config.AuthProperties;
 import com.chiangraipass.config.OAuthPrivacyNoticeContext;
@@ -87,9 +88,9 @@ public class AuthController {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "Acknowledge the published privacy notice before creating an account.");
         }
-        if (request.password().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at most 72 UTF-8 bytes.");
-        }
+            PasswordPolicy.validate(request.password()).ifPresent(problem -> {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, problem);
+        });
 
         String email = VisitorAccountService.normalizeEmail(request.email());
         if (accountService.findByEmail(email).isPresent()) {
