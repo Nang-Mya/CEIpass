@@ -1,5 +1,6 @@
 server:
   port: ${PORT:8080}
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
 
 spring:
   application:
@@ -50,6 +51,9 @@ app:
     apple:
       client-id: ${APPLE_CLIENT_ID:}
       client-secret: ${APPLE_CLIENT_SECRET:}
+  mail:
+    mode: ${MAIL_MODE:log}
+    from: ${MAIL_FROM:no-reply@ceipass.local}
 
 management:
   endpoints:

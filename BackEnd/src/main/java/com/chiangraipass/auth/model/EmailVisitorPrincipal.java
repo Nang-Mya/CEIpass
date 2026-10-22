@@ -39,4 +39,9 @@ public record EmailVisitorPrincipal(VisitorAccount account) implements UserDetai
     public String getUsername() {
         return account.email();
     }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return !account.isLocked(java.time.Instant.now());
+    }
 }

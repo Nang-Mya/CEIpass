@@ -3,7 +3,7 @@ package com.chiangraipass.auth.service;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-
+import java.time.Instant;
 import com.chiangraipass.auth.entity.VisitorAccountEntity;
 import com.chiangraipass.auth.model.VisitorAccount;
 import com.chiangraipass.auth.repository.VisitorAccountJpaRepository;
@@ -66,5 +66,15 @@ public class VisitorAccountService {
 
     public static String normalizeEmail(String email) {
         return email.strip().toLowerCase(Locale.ROOT);
+    }
+
+    @Transactional
+    public boolean markEmailVerified(UUID accountId) {
+        return accounts.findById(accountId)
+                .map(account -> {
+                    account.markEmailVerified(Instant.now());
+                    return true;
+                })
+                .orElse(false);
     }
 }
