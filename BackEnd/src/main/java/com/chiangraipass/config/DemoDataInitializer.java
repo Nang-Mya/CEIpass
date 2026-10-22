@@ -17,7 +17,6 @@ public class DemoDataInitializer {
             VisitorAccountService accountService,
             PasswordEncoder passwordEncoder) {
         return args -> {
-            // Demo account 1: for general testing
             String demoEmail1 = "demo@ceipass.com";
             if (accountService.findByEmail(demoEmail1).isEmpty()) {
                 accountService.createEmailAccount(
@@ -25,18 +24,6 @@ public class DemoDataInitializer {
                         demoEmail1,
                         "Demo Visitor",
                         passwordEncoder.encode("password123456"),
-                        "v1.0"
-                );
-            }
-
-            // Demo account 2: for testing with a different user and switch to a different account
-            String demoEmail2 = "visitor@chiangrai.com";
-            if (accountService.findByEmail(demoEmail2).isEmpty()) {
-                accountService.createEmailAccount(
-                        UUID.fromString("22222222-2222-2222-2222-222222222222"),
-                        demoEmail2,
-                        "Somchai Traveler",
-                        passwordEncoder.encode("chiangrai2026"),
                         "v1.0"
                 );
             }

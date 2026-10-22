@@ -85,9 +85,10 @@ public class SecurityConfiguration {
             ObjectProvider<ClientRegistrationRepository> registrations) throws Exception {
         http
                 .cors(Customizer.withDefaults())
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(csrfTokenRepository)
-                        .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
+                .csrf(csrf -> csrf.disable())
+                // .csrf(csrf -> csrf
+                //         .csrfTokenRepository(csrfTokenRepository)
+                //         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
                 .authenticationProvider(authenticationProvider)
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
