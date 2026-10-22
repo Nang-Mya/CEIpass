@@ -182,7 +182,7 @@ class AuthControllerTest {
         org.junit.jupiter.api.Assertions.assertNotNull(tokenCookie);
 
         mockMvc.perform(post("/api/v1/auth/register")
-                        .cookie(new MockCookie("XSRF-TOKEN", tokenCookie.getValue()))
+                        .cookie(new jakarta.servlet.http.Cookie("XSRF-TOKEN", tokenCookie.getValue()))
                         .header("X-XSRF-TOKEN", tokenCookie.getValue())
                         .contentType("application/json")
                         .content("""
