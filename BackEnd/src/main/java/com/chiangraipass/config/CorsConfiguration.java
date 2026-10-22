@@ -18,9 +18,9 @@ public class CorsConfiguration implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**")
-                .allowedOrigins(corsProperties.allowedOrigins().toArray(String[]::new))
+                .allowedOriginPatterns("*") // fixed to allow all port and cloud run
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
-                .allowedHeaders("Accept", "Authorization", "Content-Type", "Idempotency-Key", "X-XSRF-TOKEN")
+                .allowedHeaders("*")
                 .allowCredentials(true);
     }
 }
