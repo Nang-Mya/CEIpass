@@ -4,16 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.chiangraipass.auth.dto.AccountResponse;
-import com.chiangraipass.auth.dto.AuthConfiguration;
-import com.chiangraipass.auth.dto.OAuthPreparationRequest;
-import com.chiangraipass.auth.dto.RegistrationRequest;
-import com.chiangraipass.auth.model.VisitorIdentity;
-import com.chiangraipass.auth.service.VisitorAccountService;
-import com.chiangraipass.config.AuthProperties;
-import com.chiangraipass.config.OAuthPrivacyNoticeContext;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -24,9 +14,20 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.chiangraipass.auth.dto.AccountResponse;
+import com.chiangraipass.auth.dto.AuthConfiguration;
+import com.chiangraipass.auth.dto.OAuthPreparationRequest;
+import com.chiangraipass.auth.dto.RegistrationRequest;
+import com.chiangraipass.auth.model.VisitorIdentity;
+import com.chiangraipass.auth.service.VisitorAccountService;
+import com.chiangraipass.config.AuthProperties;
+import com.chiangraipass.config.OAuthPrivacyNoticeContext;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -49,7 +50,8 @@ public class AuthController {
     public ResponseEntity<Map<String, String>> csrf(CsrfToken csrfToken) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(Map.of("token", csrfToken.getToken()));
+                .body(Map.of("token", csrfToken != null ? csrfToken.getToken() : "csrf-disabled"));
+                // .body(Map.of("token", csrfToken.getToken()));
     }
 
     @GetMapping("/config")
