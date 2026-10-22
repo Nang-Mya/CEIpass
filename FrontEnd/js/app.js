@@ -120,7 +120,7 @@ function attractionCard(attraction, compact = false) {
     : `<span>${attraction.initials}</span>`;
 
   return `<article class="attraction-card${compact ? " attraction-card-compact" : ""}">
-    <div class="attraction-art ${attraction.tone}" aria-hidden="true">${mediaContent}</div>
+    <div class="attraction-art ${attraction.tone}">${mediaContent}</div>
     <div class="attraction-info">
       <p class="card-kicker">${attraction.category}</p>
       <h3>${attraction.name}</h3>
