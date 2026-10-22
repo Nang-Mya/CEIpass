@@ -116,7 +116,7 @@ function updateCartCount() {
 function announce(message) { announcer.textContent = message; }
 function currentPage() {
   const page = window.location.hash.slice(1).split("?")[0];
-  return ["home", "buy", "qr", "history", "profile"].includes(page) ? page : "home";
+  return ["home", "buy", "qr", "history", "profile","verify"].includes(page) ? page : "home";
 }
 
 function pageHeading(eyebrow, title, description = "") {
@@ -340,6 +340,47 @@ async function renderProfilePage() {
   if (currentPage() === "profile") appContent.innerHTML = profilePage(authState);
 }
 
+let verifyState = null;
+
+function verifyHtml(state) {
+  return `<section>${pageHeading("Your account", escapeHtml(state.title))}<div class="empty-state"><p>${escapeHtml(state.message)}</p><a class="button button-dark" href="#profile">Go to sign in</a></div></section>`;
+}
+
+async function renderVerifyPage() {
+  const token = new URLSearchParams(window.location.hash.split("?")[1] || "").get("token");
+  if (!token) {
+    appContent.innerHTML = verifyHtml(verifyState || { title: "Could not verify email", message: "This verification link is incomplete. Open the link from your email again." });
+    return;
+  }
+  if (verifyState && verifyState.token === token && !verifyState.pending) { appContent.innerHTML = verifyHtml(verifyState); return; }
+  if (verifyState && verifyState.pending === token) return;
+  verifyState = { pending: token };
+  appContent.innerHTML = `<section>${pageHeading("Your account", "Verifying your email...")}</section>`;
+  let result;
+  try {
+    const csrf = await csrfHeaders();
+    const reply = await requestJson("/api/v1/auth/verify-email", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
+    result = { token, title: "Email verified", message: reply.message };
+  } catch (e) { result = { token, title: "Could not verify email", message: e.message }; }
+  verifyState = result;
+  if (currentPage() === "verify") appContent.innerHTML = verifyHtml(result);
+}
+
+function addResendButton(form, msg) {
+  if (form.querySelector("#resend-verification")) return;
+  const button = document.createElement("button");
+  button.type = "button"; button.id = "resend-verification"; button.className = "button button-outline button-full"; button.textContent = "Resend verification email";
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const csrf = await csrfHeaders();
+      const reply = await requestJson("/api/v1/auth/resend-verification", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ email: form.elements.email.value.trim() }) });
+      msg.textContent = reply.message;
+    } catch (e) { msg.textContent = e.message; } finally { button.disabled = false; }
+  });
+  msg.after(button);
+}
+
 function setProfileMode(mode) { profileMode = mode === "register" ? "register" : "login"; profileFeedback = ""; render(); }
 
 async function render() {
@@ -352,6 +393,7 @@ async function render() {
     case "qr": void renderQrPage(); break;
     case "history": void renderHistoryPage(); break;
     case "profile": void renderProfilePage(); break;
+    case "verify": void renderVerifyPage(); break;
     default: appContent.innerHTML = homePage();
   }
 }
@@ -428,18 +470,18 @@ document.addEventListener("submit", async (event) => {
   try {
     const csrf = await csrfHeaders();
     if (profileMode === "register") {
-      await requestJson("/api/v1/auth/register", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ fullName: form.elements.fullName.value.trim(), email: form.elements.email.value.trim(), password: form.elements.password.value, privacyNoticeAcknowledged: form.elements.privacyNoticeAcknowledged.checked }) });
-      profileMode = "login"; profileFeedback = "Account created. Sign in."; await renderProfilePage(); return;
+      const created = await requestJson("/api/v1/auth/register", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ fullName: form.elements.fullName.value.trim(), email: form.elements.email.value.trim(), password: form.elements.password.value, privacyNoticeAcknowledged: form.elements.privacyNoticeAcknowledged.checked }) });
+      profileMode = "login"; profileFeedback = created.message;; await renderProfilePage(); return;
     }
     const res = await fetch(apiUrl("/api/v1/auth/login"), { method: "POST", headers: { ...csrf, Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ email: form.elements.email.value.trim(), password: form.elements.password.value }), credentials: "include" });
       if (!res.ok) {
-      let reason = "Sign in failed. Please try again.";
-      try { const body = await res.json(); if (typeof body.message === "string") reason = body.message; } catch (e) {}
-      throw new Error(reason);
+        let reason = "Sign in failed. Please try again.", notVerified = false;
+        try { const body = await res.json(); if (typeof body.message === "string") reason = body.message; notVerified = body.code === "EMAIL_NOT_VERIFIED"; } catch (e) {}
+        const failure = new Error(reason); failure.notVerified = notVerified; throw failure;
     }
 
     const account = await res.json(); profileFeedback = await clearQrForAccountSwitch(account.accountId) || "Signed in."; profileMode = "login"; window.location.hash = "#profile"; await renderProfilePage();
-  } catch (e) { msg.textContent = e.message; } finally { btn.disabled = false; }
+  } catch (e) { msg.textContent = e.message; if (e.notVerified) addResendButton(form, msg); } finally { btn.disabled = false; }
 });
 
 window.addEventListener("hashchange", render);

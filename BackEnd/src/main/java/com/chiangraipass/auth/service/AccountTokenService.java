@@ -90,4 +90,11 @@ public class AccountTokenService {
             throw new IllegalStateException("SHA-256 is unavailable.", e);
         }
     }
+
+    /** True if a token of this purpose was issued for the account within the given period. */
+    @Transactional(readOnly = true)
+    public boolean issuedRecently(UUID accountId, AccountTokenPurpose purpose, Duration within) {
+        return tokens.existsByAccountIdAndPurposeAndCreatedAtAfter(
+                accountId, purpose, clock.instant().minus(within));
+    }
 }

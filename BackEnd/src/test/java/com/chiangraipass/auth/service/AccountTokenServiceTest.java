@@ -122,6 +122,19 @@ class AccountTokenServiceTest {
         assertThat(service.consume(fresh, AccountTokenPurpose.PASSWORD_RESET)).contains(accountId);
     }
 
+    @Test
+    void reportsWhetherATokenWasIssuedRecently() {
+        service.issue(accountId, AccountTokenPurpose.VERIFY_EMAIL, HOUR);
+
+        assertThat(service.issuedRecently(accountId, AccountTokenPurpose.VERIFY_EMAIL, Duration.ofMinutes(1))).isTrue();
+        assertThat(service.issuedRecently(accountId, AccountTokenPurpose.PASSWORD_RESET, Duration.ofMinutes(1))).isFalse();
+        assertThat(service.issuedRecently(UUID.randomUUID(), AccountTokenPurpose.VERIFY_EMAIL, Duration.ofMinutes(1))).isFalse();
+
+        clock.advance(Duration.ofMinutes(2));
+
+        assertThat(service.issuedRecently(accountId, AccountTokenPurpose.VERIFY_EMAIL, Duration.ofMinutes(1))).isFalse();
+    }
+
     private static final class MutableClock extends Clock {
         private Instant now;
 

@@ -36,10 +36,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     public static List<Rule> defaultRules() {
-        return List.of(
+            return List.of(
                 new Rule("POST", "/api/v1/auth/login", 20, Duration.ofMinutes(10)),
                 new Rule("POST", "/api/v1/auth/register", 5, Duration.ofHours(1)),
-                new Rule("POST", "/api/v1/auth/oauth/prepare", 20, Duration.ofMinutes(10)));
+                new Rule("POST", "/api/v1/auth/oauth/prepare", 20, Duration.ofMinutes(10)),
+                new Rule("POST", "/api/v1/auth/verify-email", 20, Duration.ofMinutes(10)),
+                new Rule("POST", "/api/v1/auth/resend-verification", 5, Duration.ofHours(1)));
     }
 
     @Override
