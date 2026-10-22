@@ -14,9 +14,9 @@ const passes = [
 ];
 
 const attractions = [
-  { name: "Wat Rong Khun", category: "Temple · Mueang Chiang Rai", initials: "WR", tone: "rose", description: "Discover the striking White Temple and its detailed contemporary artwork.", image: "./images/wat-rong-khun.jpg" },
-  { name: "Baan Dam Museum", category: "Museum · Nang Lae", initials: "BD", tone: "ink", description: "Explore the distinctive art and architecture of the Black House Museum.", image: "./images/baan-dam.jpg" },
-  { name: "Singha Park", category: "Nature · Mae Kon", initials: "SP", tone: "leaf", description: "Take in open landscapes, gardens, and outdoor activities in Chiang Rai.", image: "./images/singha-park.jpg" }
+  { name: "Wat Rong Khun", category: "Temple · Mueang Chiang Rai", initials: "WR", tone: "rose", description: "Discover the striking White Temple and its detailed contemporary artwork.", image: "images/wat-rong-khun.jpg" },
+  { name: "Baan Dam Museum", category: "Museum · Nang Lae", initials: "BD", tone: "ink", description: "Explore the distinctive art and architecture of the Black House Museum.", image: "images/baan-dam.jpg" },
+  { name: "Singha Park", category: "Nature · Mae Kon", initials: "SP", tone: "leaf", description: "Take in open landscapes, gardens, and outdoor activities in Chiang Rai.", image: "images/singha-park.jpg" }
 ];
 
 const appContent = document.querySelector("#app-content");
