@@ -62,6 +62,15 @@ public class VisitorAccountEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    @Column(name = "failed_login_count", nullable = false)
+    private int failedLoginCount = 0;
+
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
     @OneToMany(mappedBy = "account", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<VisitorExternalIdentityEntity> identities = new HashSet<>();
 
@@ -89,6 +98,8 @@ public class VisitorAccountEntity {
         identity.setProviderSubject(subject);
         identity.setAccount(account);
         account.identities.add(identity);
+                // The OIDC flow rejects providers that do not report a verified email.
+        account.emailVerifiedAt = Instant.now();
         return account;
     }
 
@@ -139,7 +150,47 @@ public class VisitorAccountEntity {
     }
 
     public VisitorAccount toAccount() {
-        return new VisitorAccount(accountId, email, displayName, passwordHash);
+        return new VisitorAccount(
+                accountId, email, displayName, passwordHash, emailVerifiedAt != null, lockedUntil);
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerifiedAt != null;
+    }
+
+    public void markEmailVerified(Instant now) {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = now;
+        }
+    }
+
+    public int getFailedLoginCount() {
+        return failedLoginCount;
+    }
+
+    public Instant getLockedUntil() {
+        return lockedUntil;
+    }
+
+    public boolean isLocked(Instant now) {
+        return lockedUntil != null && lockedUntil.isAfter(now);
+    }
+
+    /** Records a failed password attempt and locks the account once the limit is reached. */
+    public void recordFailedLogin(Instant now, int maxAttempts, java.time.Duration lockDuration) {
+        if (lockedUntil != null && !lockedUntil.isAfter(now)) {
+            lockedUntil = null;
+            failedLoginCount = 0;
+        }
+        failedLoginCount++;
+        if (failedLoginCount >= maxAttempts) {
+            lockedUntil = now.plus(lockDuration);
+        }
+    }
+
+    public void clearLoginFailures() {
+        failedLoginCount = 0;
+        lockedUntil = null;
     }
 
     public UUID getAccountId() {

@@ -8,8 +8,12 @@ import com.chiangraipass.auth.dto.AccountResponse;
 import com.chiangraipass.auth.dto.AuthConfiguration;
 import com.chiangraipass.auth.dto.OAuthPreparationRequest;
 import com.chiangraipass.auth.dto.RegistrationRequest;
+import com.chiangraipass.auth.dto.ResendVerificationRequest;
+import com.chiangraipass.auth.dto.VerifyEmailRequest;
 import com.chiangraipass.auth.model.VisitorIdentity;
+import com.chiangraipass.auth.service.PasswordPolicy;
 import com.chiangraipass.auth.service.VisitorAccountService;
+import com.chiangraipass.auth.service.EmailVerificationService;
 import com.chiangraipass.config.AuthProperties;
 import com.chiangraipass.config.OAuthPrivacyNoticeContext;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,9 +28,20 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.chiangraipass.auth.dto.AccountResponse;
+import com.chiangraipass.auth.dto.AuthConfiguration;
+import com.chiangraipass.auth.dto.OAuthPreparationRequest;
+import com.chiangraipass.auth.dto.RegistrationRequest;
+import com.chiangraipass.auth.model.VisitorIdentity;
+import com.chiangraipass.auth.service.VisitorAccountService;
+import com.chiangraipass.config.AuthProperties;
+import com.chiangraipass.config.OAuthPrivacyNoticeContext;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -35,21 +50,25 @@ public class AuthController {
     private final VisitorAccountService accountService;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final AuthProperties authProperties;
+    private final EmailVerificationService emailVerification;
 
     public AuthController(
             VisitorAccountService accountService,
             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder,
-            AuthProperties authProperties) {
+            AuthProperties authProperties,
+            EmailVerificationService emailVerification) {
         this.accountService = accountService;
         this.passwordEncoder = passwordEncoder;
         this.authProperties = authProperties;
+        this.emailVerification = emailVerification;
     }
 
     @GetMapping("/csrf")
     public ResponseEntity<Map<String, String>> csrf(CsrfToken csrfToken) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(Map.of("token", csrfToken.getToken()));
+                .body(Map.of("token", csrfToken != null ? csrfToken.getToken() : "csrf-disabled"));
+                // .body(Map.of("token", csrfToken.getToken()));
     }
 
     @GetMapping("/config")
@@ -87,29 +106,57 @@ public class AuthController {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST, "Acknowledge the published privacy notice before creating an account.");
         }
-        if (request.password().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at most 72 UTF-8 bytes.");
-        }
+            PasswordPolicy.validate(request.password()).ifPresent(problem -> {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, problem);
+        });
 
         String email = VisitorAccountService.normalizeEmail(request.email());
         if (accountService.findByEmail(email).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account already exists for this email.");
         }
 
+        UUID accountId = UUID.randomUUID();
+        String displayName = request.fullName().strip();
         try {
             accountService.createEmailAccount(
-                    UUID.randomUUID(),
+                    accountId,
                     email,
-                    request.fullName().strip(),
+                    displayName,
                     passwordEncoder.encode(request.password()),
                     authProperties.privacy().noticeVersion());
         } catch (DataIntegrityViolationException exception) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account already exists for this email.");
         }
 
+        emailVerification.sendVerification(accountId, email, displayName);
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .cacheControl(CacheControl.noStore())
-                .body(Map.of("message", "Account created. Sign in with your email and password."));
+                .body(Map.of("message",
+                        "Account created. Check your email and open the verification link before signing in."));
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<Map<String, String>> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        if (!emailVerification.verify(request.token())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "This verification link is invalid or has expired. "
+                            + "Sign in with your email and password to request a new one.");
+        }
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(Map.of("message", "Email verified. You can now sign in."));
+    }
+
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Map<String, String>> resendVerification(
+            @Valid @RequestBody ResendVerificationRequest request) {
+        emailVerification.resend(request.email());
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(Map.of("message",
+                        "If that email belongs to an account that still needs verification, "
+                                + "a new link has been sent."));
     }
 
     @PostMapping("/oauth/prepare")
