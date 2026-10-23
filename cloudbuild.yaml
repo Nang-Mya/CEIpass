@@ -41,6 +41,8 @@ steps:
       - "--allow-unauthenticated"
       - "--port"
       - "8080"
+      - "--update-env-vars"
+      - "CORS_ALLOWED_ORIGINS=https://cei-pass-601519625751.us-central1.run.app"
 
 images:
   - "${_REGION}-docker.pkg.dev/${_PROJECT_ID}/${_AR_REPOSITORY}/${_SERVICE_NAME}:$COMMIT_SHA"
