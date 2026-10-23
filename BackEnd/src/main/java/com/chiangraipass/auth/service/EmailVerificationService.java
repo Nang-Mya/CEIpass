@@ -3,11 +3,12 @@ package com.chiangraipass.auth.service;
 import java.time.Duration;
 import java.util.UUID;
 
-import com.chiangraipass.auth.model.AccountTokenPurpose;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import com.chiangraipass.auth.model.AccountTokenPurpose;
 
 /** Sends verification links and turns a valid link into a verified email address. */
 @Service
@@ -27,7 +28,7 @@ public class EmailVerificationService {
             AccountTokenService tokens,
             VisitorAccountService accounts,
             MailService mail,
-            @Value("${app.auth.frontend-url:http://localhost:5500}") String frontendUrl) {
+            @Value("${app.auth.frontend-url:http://localhost:8080}") String frontendUrl) {
         this.tokens = tokens;
         this.accounts = accounts;
         this.mail = mail;
