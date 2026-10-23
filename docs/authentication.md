@@ -2,9 +2,9 @@
 
 The API supports email/password accounts and optional Google and Apple OpenID Connect sign-in. Authentication uses a server-side Spring Security session; the browser receives an HTTP-only `JSESSIONID` cookie. Passwords are stored as BCrypt hashes and unsafe requests require a CSRF token.
 
-## Database
+## Local database
 
-Flyway migration `V3__create_visitor_accounts.sql` creates visitor accounts and external provider identities. Start the API with the existing SQL Server settings so Flyway can apply the migration.
+The backend currently uses an in-memory H2 database by default. Spring Data JPA repositories persist accounts for the lifetime of the running process, and Hibernate generates/updates the schema (`spring.jpa.hibernate.ddl-auto: update`). Flyway is disabled and there are no checked-in backend schema migrations. Local accounts are lost when the API stops. Choose and configure a persistent production database and migration strategy before using this authentication service for production accounts.
 
 ## Registration and privacy notice
 
@@ -16,6 +16,11 @@ New-account registration is disabled by default. Enable it only after publishing
 
 The API reports registration as available only when the explicit enable flag is true and both notice settings are valid. The registration form requires acknowledgement of that notice; it does not collect marketing consent. Existing accounts may still sign in while registration is disabled.
 
+## Password rules
+
+New passwords must have at least 8 characters (at most 72), at least 1 number, at least 1 special character, and only English letters, numbers and symbols. Spaces are allowed but do not count as special characters. The rules are enforced by `PasswordPolicy` on the server and mirrored in the browser for faster feedback; the server response lists every unmet rule.
+
+- **Sign-in messages:** the first five wrong passwords (and any unknown email) return the same `Invalid email or password.` message. The fifth wrong password locks the account; from the next attempt the response (`423`) says it is locked for 10 minutes, even if the password is then correct. This reveals that the email has an account, but only after five failed attempts on it.
 ## Google
 
 Create an OAuth 2.0 web client and configure:
@@ -58,6 +63,12 @@ At least one provider must have both its client ID and secret configured when `O
 - `POST /api/v1/auth/logout` invalidates the current session.
 - `POST /api/v1/auth/oauth/prepare` validates provider setup, records the notice acknowledgement for a new OAuth account, and returns its authorization URL.
 - OAuth callbacks use Spring Security's state validation and OIDC token/signature validation; only verified provider emails are accepted.
+
+## Email verification
+
+New email/password accounts must verify their email before they can sign in. Registration emails a single-use link (`/#verify?token=...`, valid 24 hours; only a hash of the token is stored). The page posts the token to `POST /api/v1/auth/verify-email`. A visitor who signs in with the correct password but an unverified email gets `403` with `code: EMAIL_NOT_VERIFIED` and a Resend button; a wrong password still returns the generic `401`, so the response never reveals verification status to someone who does not know the password. `POST /api/v1/auth/resend-verification` always answers the same way and sends at most one link per minute per account. Accounts created through Google/Apple are verified automatically.
+
+Mail settings: `MAIL_MODE=log` (default) prints emails to the application log for local development; it exposes links, so production must set `MAIL_MODE=smtp` together with `MAIL_FROM` and `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`. Links point to `FRONTEND_URL`. Accounts that existed before this change must be backfilled with an `email_verified_at` value (or asked to verify) when the production database migration is written.
 
 ## Before production
 

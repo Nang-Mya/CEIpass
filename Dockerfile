@@ -1,6 +1,6 @@
-FROM nginxinc/nginx-unprivileged:stable-alpine
-
-COPY --chown=nginx:nginx FrontEnd/ /usr/share/nginx/html/
-COPY --chown=nginx:nginx deploy/nginx.conf /etc/nginx/conf.d/default.conf
-
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY BackEnd/target/cei-pass-api-*.jar app.jar
+ENV PORT=8080
 EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -3,7 +3,7 @@ package com.chiangraipass.config;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.chiangraipass.api.auth.AuthProperties;
+import com.chiangraipass.config.AuthProperties;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
