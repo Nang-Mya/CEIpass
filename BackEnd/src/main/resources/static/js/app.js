@@ -128,8 +128,15 @@ function emptyCatalogState() {
 }
 
 function attractionCard(attraction, compact = false) {
+  const imageHtml = attraction.imageUrl 
+    ? `<img src="${escapeHtml(attraction.imageUrl)}" alt="${escapeHtml(attraction.name)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit;">`
+    : `<span>${attraction.initials}</span>`; 
+    // if don't have img it'll show short name instead of blank space
+
   return `<article class="attraction-card${compact ? " attraction-card-compact" : ""}">
-    <div class="attraction-art ${attraction.tone}" aria-hidden="true"><span>${attraction.initials}</span></div>
+    <div class="attraction-art ${attraction.tone}" aria-hidden="true">
+      ${imageHtml}
+    </div>
     <div class="attraction-info"><p class="card-kicker">${escapeHtml(attraction.category)}</p><h3>${escapeHtml(attraction.name)}</h3>
     ${compact ? "" : `<p>${escapeHtml(attraction.description)}</p>`}<span class="partner-label"><span class="partner-dot"></span>Pass partner</span></div></article>`;
 }
