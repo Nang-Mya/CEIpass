@@ -208,11 +208,11 @@ function buyPage() {
 }
 
 async function csrfHeaders() {
-  // await requestJson("/api/v1/auth/csrf", { cache: "no-store" });
-  // const cookie = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
-  // if (!cookie) throw new Error("Security token missing.");
-  // return { "X-XSRF-TOKEN": decodeURIComponent(cookie[1]) };
-  return {};
+  await requestJson("/api/v1/auth/csrf", { cache: "no-store" });
+  const cookie = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+  if (!cookie) throw new Error("Security token missing.");
+  return { "X-XSRF-TOKEN": decodeURIComponent(cookie[1]) };
+  // return {};
 }
 
 // ... [คงฟังก์ชัน QR และ Storage อื่นๆ ไว้เหมือนเดิม] ...
