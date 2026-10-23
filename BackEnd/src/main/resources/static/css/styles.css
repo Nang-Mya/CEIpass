@@ -400,32 +400,30 @@ input:focus-visible {
 }
 
 .attraction-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  grid-template-columns: 7rem 1fr;
   border: 1px solid #e6e8df;
   border-radius: 1rem;
   background: #fff;
 }
 
-.attraction-art {
-  display: grid;
-  min-height: 8.4rem;
-  place-items: center;
-  overflow: hidden;
-  color: rgb(255 255 255 / 87%);
-  font-family: Georgia, serif;
-  font-size: 1.7rem;
+
+.attraction-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center; 
+  display: block;
 }
 
-.attraction-art span {
-  display: grid;
-  width: 3.3rem;
-  height: 3.3rem;
-  place-items: center;
-  border: 1px solid rgb(255 255 255 / 42%);
-  border-radius: 50%;
-  background: rgb(255 255 255 / 11%);
+attraction-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10; 
+  min-height: 0;         
+  overflow: hidden;
+  background: transparent;
 }
 
 .attraction-art.rose {
