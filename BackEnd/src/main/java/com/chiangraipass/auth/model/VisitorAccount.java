@@ -9,14 +9,21 @@ public record VisitorAccount(
         String displayName,
         String passwordHash,
         boolean emailVerified,
-        Instant lockedUntil) {
+        Instant lockedUntil,
+        String securityToken) {
 
     /** Compatibility constructor: treated as verified and unlocked. */
-    public VisitorAccount(UUID accountId, String email, String displayName, String passwordHash) {
-        this(accountId, email, displayName, passwordHash, true, null);
+    public VisitorAccount(UUID accountId, String email, String displayName, String passwordHash, Instant lockedUntil) {
+        this(accountId, email, displayName, passwordHash, true, lockedUntil, null);
     }
 
     public boolean isLocked(Instant now) {
         return lockedUntil != null && lockedUntil.isAfter(now);
+    }
+
+    /** Keeps the password hash and security token out of logs. */
+    @Override
+    public String toString() {
+        return "VisitorAccount[accountId=" + accountId + "]";
     }
 }

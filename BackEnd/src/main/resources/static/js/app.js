@@ -20,6 +20,7 @@ const cartCount = document.querySelector("#cart-count");
 const announcer = document.querySelector("#app-announcer");
 const apiBaseUrl = window.CEIPASS_CONFIG?.apiBaseUrl;
 let profileMode = "login";
+let resetEmail = "", resetToken = "";
 let qrRefreshTimer;
 let profileFeedback = "";
 
@@ -116,7 +117,7 @@ function updateCartCount() {
 function announce(message) { announcer.textContent = message; }
 function currentPage() {
   const page = window.location.hash.slice(1).split("?")[0];
-  return ["home", "buy", "qr", "history", "profile","verify"].includes(page) ? page : "home";
+  return ["home", "buy", "qr", "history", "profile","reset"].includes(page) ? page : "home";
 }
 
 function pageHeading(eyebrow, title, description = "") {
@@ -315,12 +316,42 @@ function profilePage(authState) {
       <button type="button" class="button button-outline button-full" data-action="logout">Sign out</button><p class="form-message">${escapeHtml(authState.notice || "")}</p></div></section>`;
   }
   const reg = profileMode === "register";
+
+  if (profileMode === "forgot") {
+    return `<section>${pageHeading("Your account", "Reset your password")}
+      <div class="profile-card"><form id="forgot-form" class="account-form" novalidate>
+        <label class="field-label">Email</label><input name="email" type="email" required autocomplete="email">
+        <button type="submit" class="button button-dark button-full">Send code →</button><p class="form-message">${escapeHtml(authState.notice || "")}</p>
+        <button type="button" class="button button-outline button-full" data-action="profile-mode" data-mode="login">Back to sign in</button>
+      </form></div></section>`;
+  }
+  if (profileMode === "otp") {
+    return `<section>${pageHeading("Your account", "Enter the code")}
+      <div class="profile-card"><form id="otp-form" class="account-form" novalidate>
+        <p>We sent a 6-digit code to <strong>${escapeHtml(resetEmail)}</strong>. It expires in 10 minutes.</p>
+        <label class="field-label">6-digit code</label><input name="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+        <button type="submit" class="button button-dark button-full">Verify code →</button><p class="form-message">${escapeHtml(authState.notice || "")}</p>
+        <small>You can request a new code once a minute.</small>
+        <button type="button" class="button button-outline button-full" data-action="resend-otp">Send a new code</button>
+      </form></div></section>`;
+  }
+  if (profileMode === "newpass") {
+    return `<section>${pageHeading("Your account", "Choose a new password")}
+      <div class="profile-card"><form id="newpass-form" class="account-form" novalidate>
+        <label class="field-label">New password</label><input name="password" type="password" required autocomplete="new-password">
+        <small>At least 8 characters, with at least 1 number and 1 special character (! @ # $ %). English letters only.</small>
+        <label class="field-label">Confirm new password</label><input name="confirm" type="password" required autocomplete="new-password">
+        <button type="submit" class="button button-dark button-full">Save new password →</button><p class="form-message">${escapeHtml(authState.notice || "")}</p>
+        <button type="button" class="button button-outline button-full" data-action="profile-mode" data-mode="login">Back to sign in</button>
+      </form></div></section>`;
+  }
   return `<section>${pageHeading("Your account", "Make it yours.")}
     <div class="profile-card"><div class="profile-tabs"><button type="button" class="${!reg ? "is-active" : ""}" data-action="profile-mode" data-mode="login">Sign in</button><button type="button" class="${reg ? "is-active" : ""}" data-action="profile-mode" data-mode="register"${authState.config.registrationEnabled ? "" : " disabled"}>Create account</button></div>
     <form id="account-form" class="account-form" novalidate>
       ${reg ? `<label class="field-label">Full name</label><input name="fullName" required>` : ""}
       <label class="field-label">Email</label><input name="email" type="email" required>
       <label class="field-label">Password</label><input name="password" type="password" required>
+      ${reg ? "" : `<button type="button" class="password-reset-link" data-action="profile-mode" data-mode="forgot">Forgot password?</button>`}
       ${reg ? `<small>At least 8 characters, with at least 1 number and 1 special character (! @ # $ %). English letters only.</small>` : ""}
       ${reg ? `<div class="consent-box"><label class="check-row"><input type="checkbox" name="privacyNoticeAcknowledged" required><span>I acknowledge the Privacy Notice.</span></label></div>` : ""}
       <button type="submit" class="button button-dark button-full">${reg ? "Create account" : "Sign in"} →</button><p id="account-message" class="form-message">${escapeHtml(authState.notice || authState.error)}</p>
@@ -341,48 +372,50 @@ async function renderProfilePage() {
   if (currentPage() === "profile") appContent.innerHTML = profilePage(authState);
 }
 
-let verifyState = null;
-
-function verifyHtml(state) {
-  return `<section>${pageHeading("Your account", escapeHtml(state.title))}<div class="empty-state"><p>${escapeHtml(state.message)}</p><a class="button button-dark" href="#profile">Go to sign in</a></div></section>`;
-}
-
-async function renderVerifyPage() {
-  const token = new URLSearchParams(window.location.hash.split("?")[1] || "").get("token");
-  if (!token) {
-    appContent.innerHTML = verifyHtml(verifyState || { title: "Could not verify email", message: "This verification link is incomplete. Open the link from your email again." });
-    return;
+document.addEventListener("submit", async (event) => {
+  const id = event.target.id;
+  if (!["forgot-form", "otp-form", "newpass-form"].includes(id)) return;
+  event.preventDefault();
+  const form = event.target, msg = form.querySelector(".form-message"), btn = form.querySelector('[type="submit"]');
+  let password = "";
+  if (id === "otp-form" && !/^[0-9]{6}$/.test(form.elements.otp.value.trim())) { msg.textContent = "Enter the 6-digit code from your email."; return; }
+  if (id === "newpass-form") {
+    password = form.elements.password.value;
+    const problem = passwordProblem(password);
+    if (problem) { msg.textContent = problem; return; }
+    if (password !== form.elements.confirm.value) { msg.textContent = "The two passwords do not match."; return; }
   }
-  if (verifyState && verifyState.token === token && !verifyState.pending) { appContent.innerHTML = verifyHtml(verifyState); return; }
-  if (verifyState && verifyState.pending === token) return;
-  verifyState = { pending: token };
-  appContent.innerHTML = `<section>${pageHeading("Your account", "Verifying your email...")}</section>`;
-  let result;
+  btn.disabled = true; msg.textContent = "Processing...";
   try {
     const csrf = await csrfHeaders();
-    const reply = await requestJson("/api/v1/auth/verify-email", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
-    result = { token, title: "Email verified", message: reply.message };
-  } catch (e) { result = { token, title: "Could not verify email", message: e.message }; }
-  verifyState = result;
-  if (currentPage() === "verify") appContent.innerHTML = verifyHtml(result);
-}
+    const post = (path, payload) => requestJson(path, { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (id === "forgot-form") {
+      resetEmail = form.elements.email.value.trim();
+      const reply = await post("/api/v1/auth/password/forgot", { email: resetEmail });
+      profileMode = "otp"; profileFeedback = reply.message; await renderProfilePage(); return;
+    }
+    if (id === "otp-form") {
+      const reply = await post("/api/v1/auth/password/verify-otp", { email: resetEmail, otp: form.elements.otp.value.trim() });
+      resetToken = reply.token; profileMode = "newpass"; profileFeedback = reply.message; await renderProfilePage(); return;
+    }
+    const reply = await post("/api/v1/auth/password/reset", { token: resetToken, newPassword: password });
+    resetEmail = ""; resetToken = ""; profileMode = "login"; profileFeedback = reply.message; await renderProfilePage();
+  } catch (e) { msg.textContent = e.message; } finally { btn.disabled = false; }
+});
 
-function addResendButton(form, msg) {
-  if (form.querySelector("#resend-verification")) return;
-  const button = document.createElement("button");
-  button.type = "button"; button.id = "resend-verification"; button.className = "button button-outline button-full"; button.textContent = "Resend verification email";
-  button.addEventListener("click", async () => {
-    button.disabled = true;
-    try {
-      const csrf = await csrfHeaders();
-      const reply = await requestJson("/api/v1/auth/resend-verification", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ email: form.elements.email.value.trim() }) });
-      msg.textContent = reply.message;
-    } catch (e) { msg.textContent = e.message; } finally { button.disabled = false; }
-  });
-  msg.after(button);
-}
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest('[data-action="resend-otp"]');
+  if (!button) return;
+  const msg = button.closest("form").querySelector(".form-message");
+  button.disabled = true; msg.textContent = "Sending...";
+  try {
+    const csrf = await csrfHeaders();
+    const reply = await requestJson("/api/v1/auth/password/forgot", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ email: resetEmail }) });
+    msg.textContent = reply.message;
+  } catch (e) { msg.textContent = e.message; } finally { button.disabled = false; }
+});
 
-function setProfileMode(mode) { profileMode = mode === "register" ? "register" : "login"; profileFeedback = ""; render(); }
+function setProfileMode(mode) { profileMode = mode === "register" ? "register" : mode === "forgot" ? "forgot" : "login"; if (profileMode !== "forgot") { resetEmail = ""; resetToken = ""; } profileFeedback = ""; render(); }
 
 async function render() {
   const page = currentPage();
@@ -394,7 +427,7 @@ async function render() {
     case "qr": void renderQrPage(); break;
     case "history": void renderHistoryPage(); break;
     case "profile": void renderProfilePage(); break;
-    case "verify": void renderVerifyPage(); break;
+    case "reset": renderResetPage(); break;
     default: appContent.innerHTML = homePage();
   }
 }
@@ -471,18 +504,18 @@ document.addEventListener("submit", async (event) => {
   try {
     const csrf = await csrfHeaders();
     if (profileMode === "register") {
-      const created = await requestJson("/api/v1/auth/register", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ fullName: form.elements.fullName.value.trim(), email: form.elements.email.value.trim(), password: form.elements.password.value, privacyNoticeAcknowledged: form.elements.privacyNoticeAcknowledged.checked }) });
-      profileMode = "login"; profileFeedback = created.message;; await renderProfilePage(); return;
+      await requestJson("/api/v1/auth/register", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ fullName: form.elements.fullName.value.trim(), email: form.elements.email.value.trim(), password: form.elements.password.value, privacyNoticeAcknowledged: form.elements.privacyNoticeAcknowledged.checked }) });
+      profileMode = "login"; profileFeedback = "Account created. Sign in."; await renderProfilePage(); return;
     }
     const res = await fetch(apiUrl("/api/v1/auth/login"), { method: "POST", headers: { ...csrf, Accept: "application/json", "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ email: form.elements.email.value.trim(), password: form.elements.password.value }), credentials: "include" });
-      if (!res.ok) {
-        let reason = "Sign in failed. Please try again.", notVerified = false;
-        try { const body = await res.json(); if (typeof body.message === "string") reason = body.message; notVerified = body.code === "EMAIL_NOT_VERIFIED"; } catch (e) {}
-        const failure = new Error(reason); failure.notVerified = notVerified; throw failure;
+    if (!res.ok) {
+      let reason = "Sign in failed. Please try again.";
+      try { const body = await res.json(); if (typeof body.message === "string") reason = body.message; } catch (e) {}
+      throw new Error(reason);
     }
 
     const account = await res.json(); profileFeedback = await clearQrForAccountSwitch(account.accountId) || "Signed in."; profileMode = "login"; window.location.hash = "#profile"; await renderProfilePage();
-  } catch (e) { msg.textContent = e.message; if (e.notVerified) addResendButton(form, msg); } finally { btn.disabled = false; }
+  } catch (e) { msg.textContent = e.message; } finally { btn.disabled = false; }
 });
 
 window.addEventListener("hashchange", render);

@@ -922,6 +922,22 @@ attraction-art {
   color: #a4aca2;
 }
 
+.password-reset-link {
+  justify-self: end;
+  margin-top: -0.25rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #315b3b;
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.password-reset-link:hover {
+  text-decoration: underline;
+}
+
 .consent-box {
   display: grid;
   margin: 0.4rem 0;

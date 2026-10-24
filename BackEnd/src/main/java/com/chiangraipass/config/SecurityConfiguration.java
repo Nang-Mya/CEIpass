@@ -7,7 +7,7 @@ import com.chiangraipass.auth.model.VisitorIdentity;
 import com.chiangraipass.auth.service.VisitorOAuth2UserService;
 import com.chiangraipass.auth.service.LoginAttemptService;
 import com.chiangraipass.auth.service.VisitorUserDetailsService;
-import com.chiangraipass.auth.model.EmailVisitorPrincipal;
+import com.chiangraipass.auth.service.VisitorAccountService;
 import com.chiangraipass.config.AuthProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,8 +19,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.authentication.CredentialsExpiredException;
-import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.Authentication;
@@ -33,10 +31,12 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.authentication.LockedException;
 
 
@@ -56,14 +56,6 @@ public class SecurityConfiguration {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder);
-        provider.setPostAuthenticationChecks(user -> {
-            if (!user.isCredentialsNonExpired()) {
-                throw new CredentialsExpiredException("User credentials have expired.");
-            }
-            if (user instanceof EmailVisitorPrincipal visitor && !visitor.account().emailVerified()) {
-                throw new DisabledException("Email address is not verified.");
-            }
-        });
         return provider;
     }
 
@@ -82,7 +74,8 @@ public class SecurityConfiguration {
             ObjectMapper objectMapper,
             AuthProperties authProperties,
             VisitorOAuth2UserService oauthUserService,
-            ObjectProvider<ClientRegistrationRepository> registrations) throws Exception {
+            ObjectProvider<ClientRegistrationRepository> registrations,
+            ObjectProvider<VisitorAccountService> accounts) throws Exception {
         http
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf
@@ -96,8 +89,9 @@ public class SecurityConfiguration {
                                 "/api/v1/auth/csrf",
                                 "/api/v1/auth/config",
                                 "/api/v1/auth/register",
-                                "/api/v1/auth/verify-email",
-                                "/api/v1/auth/resend-verification",
+                                "/api/v1/auth/password/forgot",
+                                "/api/v1/auth/password/verify-otp",
+                                "/api/v1/auth/password/reset",
                                 "/api/v1/auth/oauth/prepare",
                                 "/api/v1/auth/login",
                                 "/oauth2/**",
@@ -124,6 +118,10 @@ public class SecurityConfiguration {
         http.addFilterBefore(
                 new RateLimitFilter(objectMapper, RateLimitFilter.defaultRules(), Clock.systemUTC()),
                 CsrfFilter.class);
+
+        http.addFilterBefore(
+        new SessionSecurityTokenFilter(accounts),
+        UsernamePasswordAuthenticationFilter.class);
 
         if (registrations.getIfAvailable() != null) {
             http.oauth2Login(oauth -> oauth
@@ -154,27 +152,17 @@ public class SecurityConfiguration {
 
     private AuthenticationFailureHandler jsonLoginFailure(ObjectMapper mapper) {
         return (request, response, exception) -> {
-            Map<String, Object> body = new LinkedHashMap<>();
-            int status;
-            if (exception instanceof LockedException) {
-                // The account locks when the 5th wrong password is recorded; from the next attempt
-                // Spring Security rejects it with LockedException before checking the password.
-                status = HttpStatus.LOCKED.value();
-                body.put("message", "Too many failed attempts. The account is locked for "
-                        + LoginAttemptService.LOCK_DURATION.toMinutes() + " minutes. Try again later.");
-            } else if (exception instanceof DisabledException) {
-                status = HttpStatus.FORBIDDEN.value();
-                body.put("code", "EMAIL_NOT_VERIFIED");
-                body.put("message", "Please verify your email address before signing in. "
-                        + "Open the link we emailed you, or request a new one.");
-            } else {
-                status = HttpServletResponse.SC_UNAUTHORIZED;
-                body.put("message", "Invalid email or password.");
-            }
-            response.setStatus(status);
+            // The account locks when the 5th wrong password is recorded; from the next attempt
+            // Spring Security rejects it with LockedException before checking the password.
+            boolean locked = exception instanceof LockedException;
+            response.setStatus(locked ? HttpStatus.LOCKED.value() : HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setHeader("Cache-Control", "no-store");
-            mapper.writeValue(response.getOutputStream(), body);
+            String message = locked
+                    ? "Too many failed attempts. The account is locked for "
+                            + LoginAttemptService.LOCK_DURATION.toMinutes() + " minutes. Try again later."
+                    : "Invalid email or password.";
+            mapper.writeValue(response.getOutputStream(), Map.of("message", message));
         };
     }
 

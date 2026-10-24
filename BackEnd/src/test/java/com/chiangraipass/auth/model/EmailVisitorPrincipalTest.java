@@ -12,7 +12,7 @@ class EmailVisitorPrincipalTest {
 
     private EmailVisitorPrincipal principal(Instant lockedUntil) {
         return new EmailVisitorPrincipal(
-                new VisitorAccount(UUID.randomUUID(), "a@example.com", "A", "hash", true, lockedUntil));
+                new VisitorAccount(UUID.randomUUID(), "a@example.com", "A", "hash", true, lockedUntil,null));
     }
 
     @Test

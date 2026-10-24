@@ -64,12 +64,6 @@ At least one provider must have both its client ID and secret configured when `O
 - `POST /api/v1/auth/oauth/prepare` validates provider setup, records the notice acknowledgement for a new OAuth account, and returns its authorization URL.
 - OAuth callbacks use Spring Security's state validation and OIDC token/signature validation; only verified provider emails are accepted.
 
-## Email verification
-
-New email/password accounts must verify their email before they can sign in. Registration emails a single-use link (`/#verify?token=...`, valid 24 hours; only a hash of the token is stored). The page posts the token to `POST /api/v1/auth/verify-email`. A visitor who signs in with the correct password but an unverified email gets `403` with `code: EMAIL_NOT_VERIFIED` and a Resend button; a wrong password still returns the generic `401`, so the response never reveals verification status to someone who does not know the password. `POST /api/v1/auth/resend-verification` always answers the same way and sends at most one link per minute per account. Accounts created through Google/Apple are verified automatically.
-
-Mail settings: `MAIL_MODE=log` (default) prints emails to the application log for local development; it exposes links, so production must set `MAIL_MODE=smtp` together with `MAIL_FROM` and `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`. Links point to `FRONTEND_URL`. Accounts that existed before this change must be backfilled with an `email_verified_at` value (or asked to verify) when the production database migration is written.
-
 ## Before production
 
 This is a functional authentication foundation, not a production identity program. Email verification, password reset/recovery, account lockout or distributed rate limiting, monitoring/abuse response, and account linking are not implemented. Add and test these controls before enabling public registration or connecting payment/pass issuance. Configure HTTPS and `SESSION_COOKIE_SECURE=true`; ensure the reverse proxy forwards only trusted headers. Review privacy and retention obligations with the responsible privacy/legal team.

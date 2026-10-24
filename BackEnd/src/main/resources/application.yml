@@ -33,17 +33,7 @@ spring:
         http-only: true
         secure: ${SESSION_COOKIE_SECURE:false}
         same-site: lax
-  mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:6831503090@lamduan.mfu.ac.th}
-    password: xhvsixymrpqccdcz
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
+
 
 app:
   cors:
@@ -63,8 +53,8 @@ app:
       client-id: ${APPLE_CLIENT_ID:}
       client-secret: ${APPLE_CLIENT_SECRET:}
   mail:
-    mode: ${MAIL_MODE:smtp}
-    from: ${MAIL_FROM:6831503090@lamduan.mfu.ac.th}
+    mode: ${MAIL_MODE:log}
+    from: ${MAIL_FROM:no-reply@ceipass.local}
 
 management:
   endpoints:

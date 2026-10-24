@@ -144,6 +144,7 @@ public class VisitorAccountEntity {
         }
     }
 
+    
     @PreUpdate
     void onUpdate() {
         updatedAt = Instant.now();
@@ -151,8 +152,20 @@ public class VisitorAccountEntity {
 
     public VisitorAccount toAccount() {
         return new VisitorAccount(
-                accountId, email, displayName, passwordHash, emailVerifiedAt != null, lockedUntil);
+                accountId,
+                email,
+                displayName,
+                passwordHash,
+                emailVerifiedAt != null,
+                lockedUntil,
+                securityToken
+        );
     }
+
+    public UUID getAccountId() {
+        return accountId;
+    }
+
 
     public boolean isEmailVerified() {
         return emailVerifiedAt != null;
@@ -193,10 +206,6 @@ public class VisitorAccountEntity {
         lockedUntil = null;
     }
 
-    public UUID getAccountId() {
-        return accountId;
-    }
-
     public String getEmail() {
         return email;
     }
@@ -216,4 +225,11 @@ public class VisitorAccountEntity {
     public Set<VisitorExternalIdentityEntity> getIdentities() {
         return identities;
     }
+    
+    public void changePassword(String newPasswordHash) {
+        this.passwordHash = newPasswordHash;
+        this.securityToken = generateSecurityToken();
+        clearLoginFailures();
+    }
+
 }
