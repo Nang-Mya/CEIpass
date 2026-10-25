@@ -1455,3 +1455,138 @@ attraction-art {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* ===== PROFILE PAGE ===== */
+.me-card {
+  margin-bottom: 1rem;
+  padding: 1.15rem;
+  border: 1px solid #d6dfd4;
+  border-radius: 1.1rem;
+  background: #e8efdc;
+}
+
+.me-identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.me-avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: #294a34;
+}
+
+.me-identity-text {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.me-identity-text strong {
+  overflow-wrap: anywhere;
+  color: #20231f;
+  font-size: 1rem;
+}
+
+.me-identity-text small,
+.me-pass-info small,
+.me-benefit small,
+.me-muted,
+.me-empty small {
+  color: #768075;
+  font-size: 0.72rem;
+}
+
+.me-pass-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.me-pass-info {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.me-pass-info strong {
+  color: #20231f;
+  font-size: 0.95rem;
+}
+
+.me-status {
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.7rem;
+  background: #fff;
+  color: #737d72;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.me-status.is-active {
+  background: #294a34;
+  color: #fff;
+}
+
+.me-subtitle {
+  margin: 1.2rem 0 0.6rem;
+  color: #294a34;
+  font-size: 0.9rem;
+}
+
+.me-benefits {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.me-benefit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: 0.8rem;
+  background: #fff;
+}
+
+.me-benefit > span:first-child {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.me-benefit strong {
+  color: #20231f;
+  font-size: 0.82rem;
+}
+
+.me-badge {
+  padding: 0.35rem 0.7rem;
+  border-radius: 0.6rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.me-badge.is-available {
+  background: #e3efd8;
+  color: #294a34;
+}
+
+.me-badge.is-used {
+  background: #eceee7;
+  color: #737d72;
+}
+
+.me-empty {
+  display: grid;
+  justify-items: start;
+  gap: 0.6rem;
+}

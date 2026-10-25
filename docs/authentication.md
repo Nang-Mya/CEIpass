@@ -64,6 +64,7 @@ At least one provider must have both its client ID and secret configured when `O
 - `POST /api/v1/auth/oauth/prepare` validates provider setup, records the notice acknowledgement for a new OAuth account, and returns its authorization URL.
 - OAuth callbacks use Spring Security's state validation and OIDC token/signature validation; only verified provider emails are accepted.
 
+
 ## Before production
 
 This is a functional authentication foundation, not a production identity program. Email verification, password reset/recovery, account lockout or distributed rate limiting, monitoring/abuse response, and account linking are not implemented. Add and test these controls before enabling public registration or connecting payment/pass issuance. Configure HTTPS and `SESSION_COOKIE_SECURE=true`; ensure the reverse proxy forwards only trusted headers. Review privacy and retention obligations with the responsible privacy/legal team.

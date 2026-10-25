@@ -42,4 +42,7 @@ public interface VisitorAccountJpaRepository extends JpaRepository<VisitorAccoun
               AND account.accountStatus = 'ACTIVE'
             """)
     Optional<String> findActiveSecurityToken(@Param("accountId") UUID accountId);
+
+    Optional<VisitorAccountEntity>
+        findByAccountIdAndAccountStatus(UUID accountId,String accountStatus);
 }

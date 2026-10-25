@@ -62,4 +62,6 @@ class VisitorAccountServiceTest {
     void changingThePasswordOfAnUnknownAccountDoesNothing() {
         assertThat(service.changePassword(UUID.randomUUID(), "new-hash")).isFalse();
     }
+
+    
 }

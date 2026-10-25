@@ -82,4 +82,11 @@ public class VisitorAccountService {
                 })
                 .orElse(false);
     }
+
+    @Transactional(readOnly = true)
+    public Optional<VisitorAccount> findById(UUID accountId) {
+    return accounts
+            .findByAccountIdAndAccountStatus(accountId, ACTIVE)
+            .map(VisitorAccountEntity::toAccount);
+    }
 }

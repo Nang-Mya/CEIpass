@@ -309,11 +309,53 @@ async function renderHistoryPage() {
   }
 }
 
+function formatPassDate(value) {
+  const d = new Date(`${value}T00:00:00`);
+  return value && Number.isFinite(d.getTime())
+    ? new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric" }).format(d) : "-";
+}
+
+function passRemaining(pass) {
+  if (pass.status !== "ACTIVE" || !pass.endDate) return "-";
+  const ms = new Date(`${pass.endDate}T23:59:59`).getTime() - Date.now();
+  if (!(ms > 0)) return "Expired";
+  const hours = Math.floor(ms / 3600000);
+  return `${Math.floor(hours / 24)} days ${hours % 24} hours`;
+}
+
+function myPassCard(authState) {
+  if (authState.passError) return `<div class="me-card"><p class="form-message">Could not load your pass. Please try again later.</p></div>`;
+  const pass = authState.pass;
+  if (!pass) return `<div class="me-card me-empty"><strong>No pass yet</strong><small>Buy a pass to see its benefits here.</small><a class="button button-dark" href="#buy">Buy a pass</a></div>`;
+  const active = pass.status === "ACTIVE";
+  const benefits = pass.benefits.length === 0
+    ? `<p class="me-muted">This pass has no listed benefits.</p>`
+    : pass.benefits.map((b) => {
+        const used = b.used >= b.limit;
+        return `<li class="me-benefit"><span><strong>${escapeHtml(b.placeName)}</strong><small>${escapeHtml(b.detail)}</small></span>
+          <span class="me-badge ${used ? "is-used" : "is-available"}">${used ? "Used" : "Available"} (${b.used}/${b.limit})</span></li>`;
+      }).join("");
+  return `<div class="me-card">
+    <div class="me-pass-head"><span class="me-pass-info">
+      <strong>${escapeHtml(pass.passName)}</strong>
+      <small>Remaining: ${escapeHtml(passRemaining(pass))}</small>
+      <small>Start: ${formatPassDate(pass.startDate)}</small>
+      <small>End: ${formatPassDate(pass.endDate)}</small></span>
+      <span class="me-status ${active ? "is-active" : ""}">${active ? "Active" : "Not active"}</span></div>
+    <h2 class="me-subtitle">Pass benefits</h2><ul class="me-benefits">${benefits}</ul></div>`;
+}
+
 function profilePage(authState) {
-  if (authState.account) {
-    return `<section>${pageHeading("Your account", `Welcome, ${escapeHtml(authState.account.displayName)}.`)}
-      <div class="profile-card"><div class="profile-option-row"><span><strong>Email address</strong><small>${escapeHtml(authState.account.email)}</small></span></div>
-      <button type="button" class="button button-outline button-full" data-action="logout">Sign out</button><p class="form-message">${escapeHtml(authState.notice || "")}</p></div></section>`;
+    if (authState.account) {
+    const account = authState.account;
+    return `<section>${pageHeading("Your account", "Profile")}
+      ${authState.notice ? `<p class="form-message">${escapeHtml(authState.notice)}</p>` : ""}
+      <div class="me-card me-identity">
+        <span class="me-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10.2"/><circle cx="12" cy="9.6" r="3.4"/><path d="M5.6 18.6c1.5-2.8 3.6-4.1 6.4-4.1s4.9 1.3 6.4 4.1"/></svg></span>
+        <span class="me-identity-text"><strong>${escapeHtml(account.displayName)}</strong><small>${escapeHtml(account.email)}</small></span>
+      </div>
+      ${myPassCard(authState)}
+      <button type="button" class="button button-outline button-full" data-action="logout">Sign out</button></section>`;
   }
   const reg = profileMode === "register";
 
@@ -366,6 +408,8 @@ async function renderProfilePage() {
     try {
       authState.account = await requestJson("/api/v1/auth/me", { cache: "no-store" });
       authState.notice = await clearQrForAccountSwitch(authState.account.accountId);
+            try { authState.pass = (await requestJson("/api/v1/me/pass", { cache: "no-store" })).pass; }
+      catch (e) { authState.passError = true; }
     } catch (e) {}
   } catch (e) { authState.error = "Auth service unavailable."; }
   if (profileFeedback) { authState.notice = profileFeedback; profileFeedback = ""; }

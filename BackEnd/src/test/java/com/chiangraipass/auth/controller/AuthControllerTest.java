@@ -141,7 +141,8 @@ class AuthControllerTest {
         VisitorAccount account = new VisitorAccount(
                 UUID.randomUUID(), email, "Chiang Rai Visitor", passwordEncoder.encode(password),null);
         given(userDetailsService.loadUserByUsername(email)).willReturn(new EmailVisitorPrincipal(account));
-
+        given(accountService.findById(account.accountId())).willReturn(Optional.of(account));
+        
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
                         .with(csrf())
                         .contentType(APPLICATION_FORM_URLENCODED)
@@ -394,6 +395,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value(
                         org.hamcrest.Matchers.containsString("has expired")));
     }
+
 //     @Test
 //     void requiresCsrfForAccountCreation() throws Exception {
 //         mockMvc.perform(post("/api/v1/auth/register")

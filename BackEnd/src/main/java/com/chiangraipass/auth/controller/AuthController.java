@@ -13,6 +13,7 @@ import com.chiangraipass.auth.dto.VerifyOtpRequest;
 import com.chiangraipass.auth.dto.ForgotPasswordRequest;
 import com.chiangraipass.auth.dto.ResetPasswordRequest;
 import com.chiangraipass.auth.model.VisitorIdentity;
+import com.chiangraipass.auth.model.VisitorAccount;
 import com.chiangraipass.auth.service.PasswordPolicy;
 import com.chiangraipass.auth.service.PasswordResetService;
 import com.chiangraipass.auth.service.VisitorAccountService;
@@ -105,9 +106,13 @@ public class AuthController {
         if (!(authentication.getPrincipal() instanceof VisitorIdentity identity)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in is required.");
         }
+        VisitorAccount account = accountService.findById(identity.accountId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in is required."));
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(new AccountResponse(identity.accountId(), identity.email(), identity.displayName()));
+                .body(new AccountResponse(
+                        account.accountId(), account.email(), account.displayName(),
+                        account.passwordHash() != null));
     }
 
     @PostMapping("/register")
