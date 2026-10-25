@@ -345,6 +345,60 @@ function myPassCard(authState) {
     <h2 class="me-subtitle">Pass benefits</h2><ul class="me-benefits">${benefits}</ul></div>`;
 }
 
+const PRIVACY_LABELS = {
+  MARKETING_EMAILS: ["Marketing emails", "Offers and news about Chiang Rai Pass"],
+  USAGE_ANALYTICS: ["Usage analytics", "Help improve the app"]
+};
+
+function privacyCard(authState) {
+  const p = authState.privacy;
+  const failed = authState.privacyError || !p;
+  const canChange = !failed && p.available;
+  const rows = Object.entries(PRIVACY_LABELS).map(([purpose, [label, description]]) => {
+    const item = failed ? null : p.preferences.find((x) => x.purpose === purpose);
+    // Only an explicit "granted" from the server is ever shown as consented.
+    const granted = Boolean(item && item.granted);
+    const status = failed
+      ? `<span class="me-badge is-used">Unavailable</span>`
+      : `<span class="me-badge ${granted ? "is-available" : "is-used"}">${granted ? "Consented" : "Not consented"}</span>`;
+    const button = canChange
+      ? `<button type="button" class="text-button" data-privacy-purpose="${purpose}" data-privacy-granted="${granted}">${granted ? "Withdraw consent" : "Give consent"}</button>`
+      : "";
+    const updated = item && item.recordedAt ? `<small>Updated ${escapeHtml(formatDate(item.recordedAt))}</small>` : "";
+    return `<li class="me-benefit"><span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small><small class="me-optional">Optional</small>${updated}</span>
+      <span class="me-privacy-actions">${status}${button}</span></li>`;
+  }).join("");
+  const note = failed
+    ? `<p class="form-message">Could not load your privacy preferences. Please try again later.</p>`
+    : (!p.available ? `<p class="me-muted">Changing preferences will be available once the Privacy Notice is published.</p>` : "");
+  return `<div class="me-card"><h2 class="me-subtitle">Privacy Notice</h2>
+      <p class="me-muted">Learn more about how your personal information is collected, used, and managed.</p>
+      <a class="me-link" href="privacy.html">Read Privacy Notice</a></div>
+    <div class="me-card" id="privacy-card" data-version="${escapeHtml(canChange ? p.noticeVersion : "")}">
+      <h2 class="me-subtitle">Privacy preferences</h2>
+      <p class="me-muted">Manage optional preferences</p>${note}
+      <ul class="me-benefits">${rows}</ul><p id="privacy-message" class="form-message"></p></div>`;
+}
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-privacy-purpose]");
+  if (!button) return;
+  const card = document.querySelector("#privacy-card"), msg = document.querySelector("#privacy-message");
+  button.disabled = true; msg.textContent = "Saving...";
+  try {
+    const csrf = await csrfHeaders();
+    await requestJson("/api/v1/me/privacy-preferences", {
+      method: "POST",
+      headers: { ...csrf, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        noticeVersion: card.dataset.version,
+        choices: [{ purpose: button.dataset.privacyPurpose, granted: button.dataset.privacyGranted !== "true" }]
+      })
+    });
+    profileFeedback = "Privacy choice saved."; await renderProfilePage();
+  } catch (e) { msg.textContent = e.message; button.disabled = false; }
+});
+
 function profilePage(authState) {
     if (authState.account) {
     const account = authState.account;
@@ -355,6 +409,7 @@ function profilePage(authState) {
         <span class="me-identity-text"><strong>${escapeHtml(account.displayName)}</strong><small>${escapeHtml(account.email)}</small></span>
       </div>
       ${myPassCard(authState)}
+      ${privacyCard(authState)}
       <button type="button" class="button button-outline button-full" data-action="logout">Sign out</button></section>`;
   }
   const reg = profileMode === "register";
@@ -395,7 +450,7 @@ function profilePage(authState) {
       <label class="field-label">Password</label><input name="password" type="password" required>
       ${reg ? "" : `<button type="button" class="password-reset-link" data-action="profile-mode" data-mode="forgot">Forgot password?</button>`}
       ${reg ? `<small>At least 8 characters, with at least 1 number and 1 special character (! @ # $ %). English letters only.</small>` : ""}
-      ${reg ? `<div class="consent-box"><label class="check-row"><input type="checkbox" name="privacyNoticeAcknowledged" required><span>I acknowledge the Privacy Notice.</span></label></div>` : ""}
+      ${reg ? `<div class="consent-box"><p><a class="me-link" href="privacy.html">Read Privacy Notice</a></p><label class="check-row"><input type="checkbox" name="privacyNoticeAcknowledged" required><span>I acknowledge the Privacy Notice.</span></label></div>` : ""}
       <button type="submit" class="button button-dark button-full">${reg ? "Create account" : "Sign in"} →</button><p id="account-message" class="form-message">${escapeHtml(authState.notice || authState.error)}</p>
     </form></div></section>`;
 }
@@ -410,6 +465,8 @@ async function renderProfilePage() {
       authState.notice = await clearQrForAccountSwitch(authState.account.accountId);
             try { authState.pass = (await requestJson("/api/v1/me/pass", { cache: "no-store" })).pass; }
       catch (e) { authState.passError = true; }
+            try { authState.privacy = await requestJson("/api/v1/me/privacy-preferences", { cache: "no-store" }); }
+      catch (e) { authState.privacyError = true; }
     } catch (e) {}
   } catch (e) { authState.error = "Auth service unavailable."; }
   if (profileFeedback) { authState.notice = profileFeedback; profileFeedback = ""; }

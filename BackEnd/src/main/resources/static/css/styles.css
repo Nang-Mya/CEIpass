@@ -1590,3 +1590,71 @@ attraction-art {
   justify-items: start;
   gap: 0.6rem;
 }
+
+.me-link {
+  color: #294a34;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.me-optional {
+  color: #526653;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.me-privacy-actions {
+  display: grid;
+  justify-items: end;
+  gap: 0.35rem;
+}
+
+.notice-page {
+  padding-bottom: 3rem;
+}
+
+.notice-section {
+  margin-bottom: 1.4rem;
+}
+
+.notice-section h2 {
+  margin: 0 0 0.5rem;
+  color: #294a34;
+  font-size: 1rem;
+}
+
+.notice-section p,
+.notice-section li {
+  color: #3d473c;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
+.notice-section ul {
+  margin: 0 0 0.6rem;
+  padding-left: 1.2rem;
+}
+
+.notice-todo {
+  margin-bottom: 1.6rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e3d79a;
+  border-radius: 0.9rem;
+  background: #fbf6dc;
+  color: #5b4d12;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.notice-todo p {
+  margin: 0.4rem 0 0;
+}
+
+.notice-page mark {
+  padding: 0 0.25rem;
+  border-radius: 0.3rem;
+  background: #fbf0b8;
+  color: #5b4d12;
+}

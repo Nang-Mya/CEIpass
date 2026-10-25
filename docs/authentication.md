@@ -53,6 +53,36 @@ At least one provider must have both its client ID and secret configured when `O
 - Store all provider secrets in the deployment secret manager/environment, never in source files or frontend JavaScript.
 - The frontend calls `GET /api/v1/auth/csrf` before registration, login, logout, and OAuth preparation. Keep the frontend and API on the same site (for example, `localhost` on different ports for local development) so the `SameSite=Lax` session cookie is sent.
 
+## Sending password-reset emails on Cloud Run
+
+The application already sends a six-digit password-reset code to the account's email address. It does not send registration confirmations or messages to a team inbox. By default, `MAIL_MODE` is `log`, so messages are written to application logs instead of being delivered. To send real email:
+
+1. Choose an SMTP or transactional-email provider and verify the sender address/domain with that provider. Use its SMTP host, username, and password; do not use your normal mailbox password. For Gmail, use an App Password and note Gmail's sending limits.
+2. In Google Cloud Secret Manager, create a secret containing the SMTP password (for example, `SMTP_PASSWORD`).
+3. Ensure the Cloud Run service's runtime service account has the **Secret Manager Secret Accessor** role for that secret.
+4. In the Cloud Run service configuration, set these environment variables:
+
+   | Variable | Example / value |
+   | --- | --- |
+   | `MAIL_MODE` | `smtp` |
+   | `MAIL_FROM` | Your provider-verified sender address |
+   | `SPRING_MAIL_HOST` | SMTP host from your provider |
+   | `SPRING_MAIL_PORT` | `587` |
+   | `SPRING_MAIL_USERNAME` | SMTP username from your provider |
+   | `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` | `true` |
+   | `SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE` | `true` |
+   | `SPRING_MAIL_PASSWORD` | Reference the `SMTP_PASSWORD` Secret Manager secret; do not enter the password as a plain environment variable |
+
+   These are standard Spring Boot mail settings, so no source-code or dependency change is needed. For example, with the `gcloud` CLI, update a service after creating the secret and granting access:
+
+   ```powershell
+   gcloud run services update SERVICE_NAME --region REGION `
+     --update-env-vars "MAIL_MODE=smtp,MAIL_FROM=verified@example.com,SPRING_MAIL_HOST=smtp.provider.example,SPRING_MAIL_PORT=587,SPRING_MAIL_USERNAME=smtp-user,SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true,SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true" `
+     --update-secrets "SPRING_MAIL_PASSWORD=SMTP_PASSWORD:latest"
+   ```
+
+5. Send a password-reset request for an existing email/password account, then check that inbox (including spam) and the Cloud Run logs. If delivery fails, logs contain `Could not send a password reset code`; check the SMTP host/port, secret access, provider credentials, and sender verification. Cloud Run blocks outbound SMTP on port 25; use the provider's authenticated TLS submission port, typically 587.
+
 ## Implemented API
 
 - `GET /api/v1/auth/config` reports whether registration is enabled and which providers are configured.
