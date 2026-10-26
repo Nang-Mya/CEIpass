@@ -148,7 +148,7 @@ public class SecurityConfiguration {
         var repo = new org.springframework.security.web.context.HttpSessionSecurityContextRepository(); 
         return (request, response, authentication) -> { 
             // Explicitly initialize session and bind the authenticated security context 
-            var session = request.getSession(true); 
+            request.getSession(true); 
             var ctx = SecurityContextHolder.createEmptyContext(); 
             ctx.setAuthentication(authentication); 
             SecurityContextHolder.setContext(ctx); 
