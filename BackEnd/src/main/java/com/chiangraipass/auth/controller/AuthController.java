@@ -2,26 +2,9 @@ package com.chiangraipass.auth.controller;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.Optional;
+import java.util.UUID;
 
-import com.chiangraipass.auth.dto.AccountResponse;
-import com.chiangraipass.auth.dto.AuthConfiguration;
-import com.chiangraipass.auth.dto.OAuthPreparationRequest;
-import com.chiangraipass.auth.dto.RegistrationRequest;
-import com.chiangraipass.auth.dto.VerifyOtpRequest;
-import com.chiangraipass.auth.dto.ForgotPasswordRequest;
-import com.chiangraipass.auth.dto.ResetPasswordRequest;
-import com.chiangraipass.auth.model.VisitorIdentity;
-import com.chiangraipass.auth.model.VisitorAccount;
-import com.chiangraipass.auth.service.PasswordPolicy;
-import com.chiangraipass.auth.service.PasswordResetService;
-import com.chiangraipass.auth.service.VisitorAccountService;
-import com.chiangraipass.config.AuthProperties;
-import com.chiangraipass.config.OAuthPrivacyNoticeContext;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.Valid;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
@@ -38,13 +21,21 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.chiangraipass.auth.dto.AccountResponse;
 import com.chiangraipass.auth.dto.AuthConfiguration;
+import com.chiangraipass.auth.dto.ForgotPasswordRequest;
 import com.chiangraipass.auth.dto.OAuthPreparationRequest;
 import com.chiangraipass.auth.dto.RegistrationRequest;
+import com.chiangraipass.auth.dto.ResetPasswordRequest;
+import com.chiangraipass.auth.dto.VerifyOtpRequest;
+import com.chiangraipass.auth.model.VisitorAccount;
 import com.chiangraipass.auth.model.VisitorIdentity;
+import com.chiangraipass.auth.service.PasswordPolicy;
+import com.chiangraipass.auth.service.PasswordResetService;
 import com.chiangraipass.auth.service.VisitorAccountService;
 import com.chiangraipass.config.AuthProperties;
 import com.chiangraipass.config.OAuthPrivacyNoticeContext;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
 @RestController
