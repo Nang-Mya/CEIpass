@@ -93,7 +93,7 @@ async function fetchCatalogData() {
   }
 }
 
-// ตะกร้าแบบใหม่เก็บเป็น Array of Objects
+//keep cart data as a JSON array of objects in localStorage, each object containing passId, startDate, endDate, and quantity.
 function readCart() {
   try {
     const value = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
@@ -223,7 +223,7 @@ async function csrfHeaders() {
   // return {};
 }
 
-// ... [คงฟังก์ชัน QR และ Storage อื่นๆ ไว้เหมือนเดิม] ...
+// keep the QR caching functions as they are, since they are already well-defined and handle IndexedDB operations for caching QR codes.
 function openQrDatabase() {
   return new Promise((resolve, reject) => {
     if (!("indexedDB" in window)) { reject(new Error("No IDB support.")); return; }

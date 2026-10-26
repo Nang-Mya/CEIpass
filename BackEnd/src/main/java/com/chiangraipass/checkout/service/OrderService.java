@@ -56,7 +56,9 @@ public class OrderService {
                 .multiply(BigDecimal.valueOf(days))
                 .multiply(BigDecimal.valueOf(request.quantity()));
 
-        // ให้ @GeneratedValue และ @PrePersist ของเพื่อนจัดการ ID และ Timestamp ให้อัตโนมัติ
+        /**Given that PaymentEntity and UserPassEntity have @GeneratedValue and @PrePersist annotations,
+         we can rely on them to handle ID generation and timestamping automatically. This ensures that
+         each payment and user pass record is uniquely identified and timestamped without manual intervention.**/
         PaymentEntity payment = new PaymentEntity();
         payment.setAccount(account);
         payment.setPass(pass);

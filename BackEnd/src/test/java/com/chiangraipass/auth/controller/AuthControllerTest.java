@@ -3,12 +3,6 @@ package com.chiangraipass.auth.controller;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.chiangraipass.auth.model.EmailVisitorPrincipal;
-import com.chiangraipass.auth.model.VisitorAccount;
-import com.chiangraipass.auth.service.VisitorAccountService;
-import com.chiangraipass.auth.service.VisitorOAuth2UserService;
-import com.chiangraipass.config.CorsConfiguration;
-import com.chiangraipass.config.SecurityConfiguration;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.ArgumentMatchers.any;
@@ -18,12 +12,12 @@ import static org.mockito.Mockito.verify;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.annotation.DirtiesContext;
 import static org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -35,11 +29,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.chiangraipass.auth.model.EmailVisitorPrincipal;
 import com.chiangraipass.auth.model.VisitorAccount;
+import com.chiangraipass.auth.service.PasswordResetService;
 import com.chiangraipass.auth.service.VisitorAccountService;
 import com.chiangraipass.auth.service.VisitorOAuth2UserService;
 import com.chiangraipass.config.CorsConfiguration;
 import com.chiangraipass.config.SecurityConfiguration;
-import com.chiangraipass.auth.service.PasswordResetService;
 
 @WebMvcTest(
         value = AuthController.class,
@@ -395,21 +389,6 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value(
                         org.hamcrest.Matchers.containsString("has expired")));
     }
-
-//     @Test
-//     void requiresCsrfForAccountCreation() throws Exception {
-//         mockMvc.perform(post("/api/v1/auth/register")
-//                         .contentType("application/json")
-//                         .content("""
-//                                 {
-//                                   "fullName": "Chiang Rai Visitor",
-//                                   "email": "visitor@example.com",
-//                                   "password": "correct horse battery staple",
-//                                   "privacyNoticeAcknowledged": true
-//                                 }
-//                                 """))
-//                 .andExpect(status().isForbidden());
-//     }
 
 //     @Test
 //     void csrfCookieTokenIsAcceptedInTheSpaRequestHeader() throws Exception {
