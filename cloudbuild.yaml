@@ -41,6 +41,11 @@ steps:
       - "--allow-unauthenticated"
       - "--port"
       - "8080"
+      - "--max-instances"
+      - "1"
+      - "--memory"
+      - "1Gi"
+      - "--session-affinity"
       - "--update-env-vars"
       - "CORS_ALLOWED_ORIGINS=https://cei-pass-601519625751.us-central1.run.app"
 

@@ -462,25 +462,52 @@ function profilePage(authState) {
     </form></div></section>`;
 }
 
-async function renderProfilePage() {
-  const authState = { account: null, config: { registrationEnabled: true }, notice: "", error: "" };
+async function renderProfilePage(loggedInAccount = null) {
+  const authState = {
+    account: loggedInAccount,
+    config: { registrationEnabled: true },
+    pass: null,
+    passError: false,
+    privacy: null,
+    privacyError: false,
+    notice: "",
+    error: ""
+  };
   appContent.innerHTML = `<section>${pageHeading("Your account", "Loading...")}</section>`;
-  
-  // 1. เช็กข้อมูลผู้ใช้ที่ล็อกอินอยู่ก่อนเป็นอันดับแรก (แยก try-catch เป็นอิสระ)
-  // 1. Check the logged-in user information first (separate try-catch independently)
-  try {
-    authState.account = await requestJson("/api/v1/auth/me", { cache: "no-store" });
-    authState.notice = await clearQrForAccountSwitch(authState.account.accountId);
-  } catch (e) {
-    // If not logged in (401), do nothing and proceed to load config for the login form
+
+  // 1. If there is no account information sent directly from the login page, then request /api/v1/auth/me
+  if (!authState.account) {
+    try {
+      authState.account = await requestJson("/api/v1/auth/me", { cache: "no-store" });
+      authState.notice = await clearQrForAccountSwitch(authState.account.accountId);
+    } catch (e) {
+      // ยังไม่ได้ล็อกอิน (401)
+    }
   }
 
-  // 2. If not logged in, then fetch config (to reduce redundant requests after login)
-  if (!authState.account) {
+  // 2. If logged in, fetch the pass (My Pass) and privacy settings to display on the Profile page
+  if (authState.account) {
+    const [passResult, privacyResult] = await Promise.allSettled([
+      requestJson("/api/v1/me/pass", { cache: "no-store" }),
+      requestJson("/api/v1/me/privacy-preferences", { cache: "no-store" })
+    ]);
+
+    if (passResult.status === "fulfilled") {
+      authState.pass = passResult.value?.pass || null;
+    } else {
+      authState.passError = true;
+    }
+
+    if (privacyResult.status === "fulfilled") {
+      authState.privacy = privacyResult.value;
+    } else {
+      authState.privacyError = true;
+    }
+  } else {
+    // 3. If not logged in, fetch the config for the login form
     try {
       authState.config = await requestJson("/api/v1/auth/config", { cache: "no-store" });
     } catch (e) {
-      // If fetching config fails, use default values instead, no need to throw an error that blocks the page
       authState.config = { registrationEnabled: true };
     }
   }
@@ -636,7 +663,13 @@ document.addEventListener("submit", async (event) => {
       throw new Error(reason);
     }
 
-    const account = await res.json(); profileFeedback = await clearQrForAccountSwitch(account.accountId) || "Signed in."; profileMode = "login"; window.location.hash = "#profile"; await renderProfilePage();
+    const account = await res.json();
+    profileFeedback = await clearQrForAccountSwitch(account.accountId) || "Signed in.";
+    profileMode = "login";
+    if (currentPage() !== "profile") {
+      window.location.hash = "#profile";
+    }
+    await renderProfilePage(account);
   } catch (e) { msg.textContent = e.message; } finally { btn.disabled = false; }
 });
 
