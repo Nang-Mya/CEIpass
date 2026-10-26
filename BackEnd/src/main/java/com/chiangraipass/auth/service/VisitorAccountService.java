@@ -1,9 +1,9 @@
 package com.chiangraipass.auth.service;
 
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import java.time.Instant;
 import com.chiangraipass.auth.entity.VisitorAccountEntity;
 import com.chiangraipass.auth.model.VisitorAccount;
 import com.chiangraipass.auth.repository.VisitorAccountJpaRepository;
@@ -68,13 +68,25 @@ public class VisitorAccountService {
         return email.strip().toLowerCase(Locale.ROOT);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<String> findSecurityToken(UUID accountId) {
+        return accounts.findActiveSecurityToken(accountId);
+    }
+
     @Transactional
-    public boolean markEmailVerified(UUID accountId) {
+    public boolean changePassword(UUID accountId, String passwordHash) {
         return accounts.findById(accountId)
                 .map(account -> {
-                    account.markEmailVerified(Instant.now());
+                    account.changePassword(passwordHash);
                     return true;
                 })
                 .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<VisitorAccount> findById(UUID accountId) {
+    return accounts
+            .findByAccountIdAndAccountStatus(accountId, ACTIVE)
+            .map(VisitorAccountEntity::toAccount);
     }
 }

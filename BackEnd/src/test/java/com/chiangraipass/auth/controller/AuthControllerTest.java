@@ -7,7 +7,6 @@ import com.chiangraipass.auth.model.EmailVisitorPrincipal;
 import com.chiangraipass.auth.model.VisitorAccount;
 import com.chiangraipass.auth.service.VisitorAccountService;
 import com.chiangraipass.auth.service.VisitorOAuth2UserService;
-import com.chiangraipass.auth.service.EmailVerificationService;
 import com.chiangraipass.config.CorsConfiguration;
 import com.chiangraipass.config.SecurityConfiguration;
 import org.junit.jupiter.api.Test;
@@ -19,6 +18,7 @@ import static org.mockito.Mockito.verify;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.annotation.DirtiesContext;
 import static org.springframework.http.MediaType.APPLICATION_FORM_URLENCODED;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -39,6 +39,7 @@ import com.chiangraipass.auth.service.VisitorAccountService;
 import com.chiangraipass.auth.service.VisitorOAuth2UserService;
 import com.chiangraipass.config.CorsConfiguration;
 import com.chiangraipass.config.SecurityConfiguration;
+import com.chiangraipass.auth.service.PasswordResetService;
 
 @WebMvcTest(
         value = AuthController.class,
@@ -60,13 +61,15 @@ class AuthControllerTest {
     private VisitorAccountService accountService;
 
     @MockitoBean
-    private EmailVerificationService emailVerification;
-
-    @MockitoBean
     private UserDetailsService userDetailsService;
 
     @MockitoBean
     private VisitorOAuth2UserService oauthUserService;
+
+        @MockitoBean
+    private PasswordResetService passwordReset;
+
+
 
     @Test
     void exposesRegistrationAvailabilityAndDoesNotCacheAccountConfiguration() throws Exception {
@@ -95,7 +98,7 @@ class AuthControllerTest {
                                 }
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.message").value("Account created. Check your email and open the verification link before signing in."));
+                .andExpect(jsonPath("$.message").value("Account created. Sign in with your email and password."));
 
         ArgumentCaptor<String> passwordHash = ArgumentCaptor.forClass(String.class);
         verify(accountService).createEmailAccount(
@@ -106,8 +109,6 @@ class AuthControllerTest {
                 eq("test-notice-v1"));
         org.junit.jupiter.api.Assertions.assertTrue(passwordHash.getValue().startsWith("$2a$12$"));
         org.junit.jupiter.api.Assertions.assertNotEquals("Correct-horse-battery-1", passwordHash.getValue());
-        verify(emailVerification).sendVerification(
-                any(UUID.class), eq("visitor@example.com"), eq("Chiang Rai Visitor"));
     }
 
     @Test
@@ -138,9 +139,10 @@ class AuthControllerTest {
         String email = "visitor@example.com";
         String password = "Correct-horse-battery-1";
         VisitorAccount account = new VisitorAccount(
-                UUID.randomUUID(), email, "Chiang Rai Visitor", passwordEncoder.encode(password));
+                UUID.randomUUID(), email, "Chiang Rai Visitor", passwordEncoder.encode(password),null);
         given(userDetailsService.loadUserByUsername(email)).willReturn(new EmailVisitorPrincipal(account));
-
+        given(accountService.findById(account.accountId())).willReturn(Optional.of(account));
+        
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
                         .with(csrf())
                         .contentType(APPLICATION_FORM_URLENCODED)
@@ -176,6 +178,7 @@ class AuthControllerTest {
     }
 
     @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
     void csrfCookieTokenIsAcceptedInTheSpaRequestHeader() throws Exception {
         given(accountService.findByEmail("visitor@example.com")).willReturn(Optional.empty());
         MvcResult tokenResult = mockMvc.perform(get("/api/v1/auth/csrf"))
@@ -272,7 +275,7 @@ class AuthControllerTest {
     @Test
     void wrongPasswordGetsTheGenericMessage() throws Exception {
         VisitorAccount account = new VisitorAccount(UUID.randomUUID(), "visitor@example.com",
-                "Chiang Rai Visitor", passwordEncoder.encode("Correct-horse-battery-1"));
+                "Chiang Rai Visitor", passwordEncoder.encode("Correct-horse-battery-1"),null);
         given(userDetailsService.loadUserByUsername("visitor@example.com"))
                 .willReturn(new EmailVisitorPrincipal(account));
 
@@ -289,7 +292,7 @@ class AuthControllerTest {
     void lockedAccountGetsTheLockMessageEvenWithTheCorrectPassword() throws Exception {
         VisitorAccount locked = new VisitorAccount(UUID.randomUUID(), "visitor@example.com",
                 "Chiang Rai Visitor", passwordEncoder.encode("Correct-horse-battery-1"),
-                true, java.time.Instant.now().plusSeconds(300));
+                true, java.time.Instant.now().plusSeconds(300),null);
         given(userDetailsService.loadUserByUsername("visitor@example.com"))
                 .willReturn(new EmailVisitorPrincipal(locked));
 
@@ -303,44 +306,9 @@ class AuthControllerTest {
                         org.hamcrest.Matchers.containsString("locked for 10 minutes")));
     }
 
-    @Test
-    void verifiesTheEmailWithAValidToken() throws Exception {
-        given(emailVerification.verify("good-token")).willReturn(true);
-
-        mockMvc.perform(post("/api/v1/auth/verify-email")
-                        .with(csrf())
-                        .contentType("application/json")
-                        .content("{\"token\":\"good-token\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Email verified. You can now sign in."));
-    }
-
-    @Test
-    void rejectsAnInvalidOrExpiredVerificationToken() throws Exception {
-        given(emailVerification.verify("old-token")).willReturn(false);
-
-        mockMvc.perform(post("/api/v1/auth/verify-email")
-                        .with(csrf())
-                        .contentType("application/json")
-                        .content("{\"token\":\"old-token\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value(
-                        org.hamcrest.Matchers.containsString("invalid or has expired")));
-    }
-
-    @Test
-    void requiresATokenToVerifyTheEmail() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/verify-email")
-                        .with(csrf())
-                        .contentType("application/json")
-                        .content("{\"token\":\"\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Verification token is required."));
-    }
-
-    @Test
-    void resendGivesTheSameAnswerWhetherOrNotTheEmailHasAnAccount() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/resend-verification")
+        @Test
+    void forgotPasswordGivesTheSameAnswerForAnyEmail() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/password/forgot")
                         .with(csrf())
                         .contentType("application/json")
                         .content("{\"email\":\"nobody@example.com\"}"))
@@ -348,42 +316,86 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value(
                         org.hamcrest.Matchers.containsString("If that email belongs to an account")));
 
-        verify(emailVerification).resend("nobody@example.com");
+        verify(passwordReset).requestOtp("nobody@example.com");
     }
 
     @Test
-    void unverifiedAccountWithTheCorrectPasswordIsToldToVerifyItsEmail() throws Exception {
-        VisitorAccount account = new VisitorAccount(UUID.randomUUID(), "visitor@example.com",
-                "Chiang Rai Visitor", passwordEncoder.encode("Correct-horse-battery-1"), false, null);
-        given(userDetailsService.loadUserByUsername("visitor@example.com"))
-                .willReturn(new EmailVisitorPrincipal(account));
+    void aCorrectCodeReturnsAResetToken() throws Exception {
+        given(passwordReset.verifyOtp("visitor@example.com", "123456"))
+                .willReturn(java.util.Optional.of("grant-token"));
 
-        mockMvc.perform(post("/api/v1/auth/login")
+        mockMvc.perform(post("/api/v1/auth/password/verify-otp")
                         .with(csrf())
-                        .contentType(APPLICATION_FORM_URLENCODED)
-                        .param("email", "visitor@example.com")
-                        .param("password", "Correct-horse-battery-1"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"))
+                        .contentType("application/json")
+                        .content("{\"email\":\"visitor@example.com\",\"otp\":\"123456\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").value("grant-token"));
+    }
+
+    @Test
+    void aWrongOrExpiredCodeIsExplained() throws Exception {
+        given(passwordReset.verifyOtp("visitor@example.com", "000000"))
+                .willReturn(java.util.Optional.empty());
+
+        mockMvc.perform(post("/api/v1/auth/password/verify-otp")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"email\":\"visitor@example.com\",\"otp\":\"000000\"}"))
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(
-                        org.hamcrest.Matchers.containsString("verify your email")));
+                        org.hamcrest.Matchers.containsString("incorrect or has expired")));
     }
 
     @Test
-    void unverifiedAccountWithAWrongPasswordGetsTheGenericMessage() throws Exception {
-        VisitorAccount account = new VisitorAccount(UUID.randomUUID(), "visitor@example.com",
-                "Chiang Rai Visitor", passwordEncoder.encode("Correct-horse-battery-1"), false, null);
-        given(userDetailsService.loadUserByUsername("visitor@example.com"))
-                .willReturn(new EmailVisitorPrincipal(account));
-
-        mockMvc.perform(post("/api/v1/auth/login")
+    void aCodeThatIsNotSixDigitsIsRejected() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/password/verify-otp")
                         .with(csrf())
-                        .contentType(APPLICATION_FORM_URLENCODED)
-                        .param("email", "visitor@example.com")
-                        .param("password", "Wrong-password-1!"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("Invalid email or password."));
+                        .contentType("application/json")
+                        .content("{\"email\":\"visitor@example.com\",\"otp\":\"12ab\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Enter the 6-digit code."));
+
+        verify(passwordReset, org.mockito.Mockito.never()).verifyOtp(any(), any());
     }
+
+    @Test
+    void resetsThePasswordWithAValidTokenAndAStrongPassword() throws Exception {
+        given(passwordReset.reset(eq("grant-token"), any(String.class))).willReturn(true);
+
+        mockMvc.perform(post("/api/v1/auth/password/reset")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"token\":\"grant-token\",\"newPassword\":\"Brand-new-pass-1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Password updated. Sign in with your new password."));
+    }
+
+    @Test
+    void aWeakNewPasswordIsRejectedWithoutUsingUpTheToken() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/password/reset")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"token\":\"grant-token\",\"newPassword\":\"abc\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("at least 8 characters")));
+
+        verify(passwordReset, org.mockito.Mockito.never()).reset(any(), any());
+    }
+
+    @Test
+    void anExpiredResetTokenIsRejected() throws Exception {
+        given(passwordReset.reset(eq("old-token"), any(String.class))).willReturn(false);
+
+        mockMvc.perform(post("/api/v1/auth/password/reset")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"token\":\"old-token\",\"newPassword\":\"Brand-new-pass-1\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        org.hamcrest.Matchers.containsString("has expired")));
+    }
+
 //     @Test
 //     void requiresCsrfForAccountCreation() throws Exception {
 //         mockMvc.perform(post("/api/v1/auth/register")

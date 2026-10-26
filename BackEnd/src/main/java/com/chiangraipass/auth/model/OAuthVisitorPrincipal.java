@@ -35,6 +35,11 @@ public class OAuthVisitorPrincipal implements OidcUser, VisitorIdentity {
     }
 
     @Override
+    public String securityToken() {
+        return account.securityToken();
+    }
+
+    @Override
     public Map<String, Object> getClaims() {
         return delegate.getClaims();
     }

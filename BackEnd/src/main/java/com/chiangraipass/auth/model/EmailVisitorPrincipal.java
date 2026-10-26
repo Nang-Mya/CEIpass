@@ -26,6 +26,11 @@ public record EmailVisitorPrincipal(VisitorAccount account) implements UserDetai
     }
 
     @Override
+    public String securityToken() {
+        return account.securityToken();
+    }
+
+    @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_VISITOR"));
     }

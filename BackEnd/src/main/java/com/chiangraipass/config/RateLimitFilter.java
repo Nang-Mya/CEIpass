@@ -36,17 +36,22 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     public static List<Rule> defaultRules() {
-            return List.of(
+        return List.of(
                 new Rule("POST", "/api/v1/auth/login", 20, Duration.ofMinutes(10)),
                 new Rule("POST", "/api/v1/auth/register", 5, Duration.ofHours(1)),
                 new Rule("POST", "/api/v1/auth/oauth/prepare", 20, Duration.ofMinutes(10)),
-                new Rule("POST", "/api/v1/auth/verify-email", 20, Duration.ofMinutes(10)),
-                new Rule("POST", "/api/v1/auth/resend-verification", 5, Duration.ofHours(1)));
+                new Rule("POST", "/api/v1/auth/password/forgot", 5, Duration.ofHours(1)),
+                new Rule("POST", "/api/v1/auth/password/verify-otp", 10, Duration.ofMinutes(10)),
+                new Rule("POST", "/api/v1/auth/password/reset", 20, Duration.ofMinutes(10)),
+                new Rule("POST", "/api/v1/me/privacy-preferences", 20, Duration.ofMinutes(10))
+        );
     }
 
     @Override
     protected void doFilterInternal(
-            HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            @org.springframework.lang.NonNull HttpServletRequest request,
+            @org.springframework.lang.NonNull HttpServletResponse response,
+            @org.springframework.lang.NonNull FilterChain chain)
             throws ServletException, IOException {
         for (ActiveRule active : rules) {
             if (matches(active.rule(), request)) {

@@ -2,6 +2,7 @@ package com.chiangraipass.auth.controller;
 
 import java.util.Map;
 
+
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,8 +13,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.chiangraipass.privacy.controller.PrivacyPreferenceController;
+
 /** Returns the reason for a rejected auth request as {"message": "..."} so the UI can show it. */
-@RestControllerAdvice(assignableTypes = AuthController.class)
+@RestControllerAdvice(assignableTypes = {AuthController.class, PrivacyPreferenceController.class})
 public class AuthExceptionHandler {
 
     @ExceptionHandler(ResponseStatusException.class)

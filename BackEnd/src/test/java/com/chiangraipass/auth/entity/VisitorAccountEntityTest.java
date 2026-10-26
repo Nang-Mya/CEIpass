@@ -19,11 +19,9 @@ class VisitorAccountEntityTest {
     }
 
     @Test
-    void newEmailAccountStartsUnverifiedAndUnlocked() {
+    void newEmailAccountStartsUnlocked() {
         VisitorAccountEntity account = emailAccount();
 
-        assertThat(account.isEmailVerified()).isFalse();
-        assertThat(account.toAccount().emailVerified()).isFalse();
         assertThat(account.isLocked(NOW)).isFalse();
         assertThat(account.getFailedLoginCount()).isZero();
     }
@@ -32,15 +30,6 @@ class VisitorAccountEntityTest {
     void oauthAccountIsVerifiedBecauseProviderConfirmedTheEmail() {
         VisitorAccountEntity account = VisitorAccountEntity.newOAuthAccount(
                 UUID.randomUUID(), "a@example.com", "A", "google", "sub-1", "v1");
-
-        assertThat(account.isEmailVerified()).isTrue();
-    }
-
-    @Test
-    void markEmailVerifiedKeepsTheFirstTimestamp() {
-        VisitorAccountEntity account = emailAccount();
-        account.markEmailVerified(NOW);
-        account.markEmailVerified(NOW.plusSeconds(60));
 
         assertThat(account.isEmailVerified()).isTrue();
     }
