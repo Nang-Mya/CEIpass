@@ -463,21 +463,35 @@ function profilePage(authState) {
 }
 
 async function renderProfilePage() {
-  const authState = { account: null, config: { registrationEnabled: false }, notice: "", error: "" };
+  const authState = { account: null, config: { registrationEnabled: true }, notice: "", error: "" };
   appContent.innerHTML = `<section>${pageHeading("Your account", "Loading...")}</section>`;
+  
+  // 1. เช็กข้อมูลผู้ใช้ที่ล็อกอินอยู่ก่อนเป็นอันดับแรก (แยก try-catch เป็นอิสระ)
+  // 1. Check the logged-in user information first (separate try-catch independently)
   try {
-    authState.config = await requestJson("/api/v1/auth/config", { cache: "no-store" });
+    authState.account = await requestJson("/api/v1/auth/me", { cache: "no-store" });
+    authState.notice = await clearQrForAccountSwitch(authState.account.accountId);
+  } catch (e) {
+    // If not logged in (401), do nothing and proceed to load config for the login form
+  }
+
+  // 2. If not logged in, then fetch config (to reduce redundant requests after login)
+  if (!authState.account) {
     try {
-      authState.account = await requestJson("/api/v1/auth/me", { cache: "no-store" });
-      authState.notice = await clearQrForAccountSwitch(authState.account.accountId);
-            try { authState.pass = (await requestJson("/api/v1/me/pass", { cache: "no-store" })).pass; }
-      catch (e) { authState.passError = true; }
-            try { authState.privacy = await requestJson("/api/v1/me/privacy-preferences", { cache: "no-store" }); }
-      catch (e) { authState.privacyError = true; }
-    } catch (e) {}
-  } catch (e) { authState.error = "Auth service unavailable."; }
-  if (profileFeedback) { authState.notice = profileFeedback; profileFeedback = ""; }
-  if (currentPage() === "profile") appContent.innerHTML = profilePage(authState);
+      authState.config = await requestJson("/api/v1/auth/config", { cache: "no-store" });
+    } catch (e) {
+      // If fetching config fails, use default values instead, no need to throw an error that blocks the page
+      authState.config = { registrationEnabled: true };
+    }
+  }
+
+  if (profileFeedback) {
+    authState.notice = profileFeedback;
+    profileFeedback = "";
+  }
+  if (currentPage() === "profile") {
+    appContent.innerHTML = profilePage(authState);
+  }
 }
 
 document.addEventListener("submit", async (event) => {
