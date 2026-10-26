@@ -56,7 +56,7 @@ async function requestJson(path, options = {}) {
     ...options,
     headers: { Accept: "application/json", ...options.headers },
     credentials: "include",
-    signal: options.signal || AbortSignal.timeout(8000)
+    signal: options.signal || AbortSignal.timeout(30000)
   });
   if (!response.ok) {
     let message = `The service returned HTTP ${response.status}.`;
