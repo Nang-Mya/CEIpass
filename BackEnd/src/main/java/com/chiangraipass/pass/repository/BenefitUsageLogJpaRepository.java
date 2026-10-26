@@ -22,4 +22,13 @@ public interface BenefitUsageLogJpaRepository extends JpaRepository<BenefitUsage
             order by l.checkinDatetime desc
             """)
     List<UsageHistoryItem> findRecentUsage(@Param("accountId") UUID accountId, Pageable pageable);
+
+    @Query("""
+            select l.benefit.benefitId, count(l)
+            from BenefitUsageLogEntity l
+            where l.userPass.userPassId = :userPassId
+              and l.validationStatus = 'VALID_SUCCESS'
+            group by l.benefit.benefitId
+            """)
+    List<Object[]> countSuccessfulUsageByBenefit(@Param("userPassId") UUID userPassId);
 }
