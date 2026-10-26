@@ -2,28 +2,16 @@ package com.chiangraipass.auth.controller;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
-import com.chiangraipass.auth.dto.AccountResponse;
-import com.chiangraipass.auth.dto.AuthConfiguration;
-import com.chiangraipass.auth.dto.OAuthPreparationRequest;
-import com.chiangraipass.auth.dto.RegistrationRequest;
-import com.chiangraipass.auth.dto.ResendVerificationRequest;
-import com.chiangraipass.auth.dto.VerifyEmailRequest;
-import com.chiangraipass.auth.model.VisitorIdentity;
-import com.chiangraipass.auth.service.PasswordPolicy;
-import com.chiangraipass.auth.service.VisitorAccountService;
-import com.chiangraipass.auth.service.EmailVerificationService;
-import com.chiangraipass.config.AuthProperties;
-import com.chiangraipass.config.OAuthPrivacyNoticeContext;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,14 +21,21 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.chiangraipass.auth.dto.AccountResponse;
 import com.chiangraipass.auth.dto.AuthConfiguration;
+import com.chiangraipass.auth.dto.ForgotPasswordRequest;
 import com.chiangraipass.auth.dto.OAuthPreparationRequest;
 import com.chiangraipass.auth.dto.RegistrationRequest;
+import com.chiangraipass.auth.dto.ResetPasswordRequest;
+import com.chiangraipass.auth.dto.VerifyOtpRequest;
+import com.chiangraipass.auth.model.VisitorAccount;
 import com.chiangraipass.auth.model.VisitorIdentity;
+import com.chiangraipass.auth.service.PasswordPolicy;
+import com.chiangraipass.auth.service.PasswordResetService;
 import com.chiangraipass.auth.service.VisitorAccountService;
 import com.chiangraipass.config.AuthProperties;
 import com.chiangraipass.config.OAuthPrivacyNoticeContext;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
 @RestController
@@ -50,25 +45,33 @@ public class AuthController {
     private final VisitorAccountService accountService;
     private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     private final AuthProperties authProperties;
-    private final EmailVerificationService emailVerification;
+    private final PasswordResetService passwordReset;
+    private final CsrfTokenRepository csrfTokenRepository;
 
     public AuthController(
             VisitorAccountService accountService,
             org.springframework.security.crypto.password.PasswordEncoder passwordEncoder,
             AuthProperties authProperties,
-            EmailVerificationService emailVerification) {
+            PasswordResetService passwordReset,
+            CsrfTokenRepository csrfTokenRepository) {
         this.accountService = accountService;
         this.passwordEncoder = passwordEncoder;
         this.authProperties = authProperties;
-        this.emailVerification = emailVerification;
+        this.passwordReset = passwordReset;
+        this.csrfTokenRepository = csrfTokenRepository;
     }
 
     @GetMapping("/csrf")
-    public ResponseEntity<Map<String, String>> csrf(CsrfToken csrfToken) {
+    public ResponseEntity<Map<String, String>> csrf(
+            CsrfToken csrfToken, HttpServletRequest request, HttpServletResponse response) {
+        CsrfToken token = csrfTokenRepository.loadToken(request);
+        if (token == null) {
+            token = csrfTokenRepository.generateToken(request);
+            csrfTokenRepository.saveToken(token, request, response);
+        }
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(Map.of("token", csrfToken != null ? csrfToken.getToken() : "csrf-disabled"));
-                // .body(Map.of("token", csrfToken.getToken()));
+                .body(Map.of("token", csrfToken != null ? csrfToken.getToken() : token.getToken()));
     }
 
     @GetMapping("/config")
@@ -94,9 +97,13 @@ public class AuthController {
         if (!(authentication.getPrincipal() instanceof VisitorIdentity identity)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in is required.");
         }
+        VisitorAccount account = accountService.findById(identity.accountId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in is required."));
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(new AccountResponse(identity.accountId(), identity.email(), identity.displayName()));
+                .body(new AccountResponse(
+                        account.accountId(), account.email(), account.displayName(),
+                        account.passwordHash() != null));
     }
 
     @PostMapping("/register")
@@ -115,48 +122,63 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "An account already exists for this email.");
         }
 
-        UUID accountId = UUID.randomUUID();
-        String displayName = request.fullName().strip();
         try {
-            accountService.createEmailAccount(
-                    accountId,
-                    email,
-                    displayName,
-                    passwordEncoder.encode(request.password()),
-                    authProperties.privacy().noticeVersion());
-        } catch (DataIntegrityViolationException exception) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "An account already exists for this email.");
-        }
-
-        emailVerification.sendVerification(accountId, email, displayName);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .cacheControl(CacheControl.noStore())
-                .body(Map.of("message",
-                        "Account created. Check your email and open the verification link before signing in."));
+        accountService.createEmailAccount(
+                UUID.randomUUID(),
+                email,
+                request.fullName().strip(),
+                passwordEncoder.encode(request.password()),
+                authProperties.privacy().noticeVersion());
+    } catch (DataIntegrityViolationException exception) {
+        throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "An account already exists for this email.");
     }
 
-    @PostMapping("/verify-email")
-    public ResponseEntity<Map<String, String>> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
-        if (!emailVerification.verify(request.token())) {
+    return ResponseEntity.status(HttpStatus.CREATED)
+            .cacheControl(CacheControl.noStore())
+            .body(Map.of(
+                    "message",
+                    "Account created. Sign in with your email and password."));
+    }
+
+    @PostMapping("/password/forgot")
+    public ResponseEntity<Map<String, String>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        passwordReset.requestOtp(request.email());
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(Map.of("message",
+                        "If that email belongs to an account, we have sent it a 6-digit code. "
+                                + "The code expires in 10 minutes."));
+    }
+
+    @PostMapping("/password/verify-otp")
+    public ResponseEntity<Map<String, String>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        Optional<String> token = passwordReset.verifyOtp(request.email(), request.otp());
+        if (token.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "This verification link is invalid or has expired. "
-                            + "Sign in with your email and password to request a new one.");
+                    "The code is incorrect or has expired. Check the code, or request a new one.");
         }
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(Map.of("message", "Email verified. You can now sign in."));
+                .body(Map.of("token", token.get(), "message", "Code accepted. Choose a new password."));
     }
 
-    @PostMapping("/resend-verification")
-    public ResponseEntity<Map<String, String>> resendVerification(
-            @Valid @RequestBody ResendVerificationRequest request) {
-        emailVerification.resend(request.email());
+    @PostMapping("/password/reset")
+    public ResponseEntity<Map<String, String>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+        // Check the new password first so a weak password does not use up the reset link.
+        PasswordPolicy.validate(request.newPassword()).ifPresent(problem -> {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, problem);
+        });
+        if (!passwordReset.reset(request.token(), passwordEncoder.encode(request.newPassword()))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "This password reset has expired. Request a new code from the sign-in page.");
+        }
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(Map.of("message",
-                        "If that email belongs to an account that still needs verification, "
-                                + "a new link has been sent."));
+                .body(Map.of("message", "Password updated. Sign in with your new password."));
     }
 
     @PostMapping("/oauth/prepare")
@@ -196,5 +218,4 @@ public class AuthController {
         return authProperties.auth().registrationEnabled()
                 && authProperties.privacy().isNoticePublished();
     }
-
 }

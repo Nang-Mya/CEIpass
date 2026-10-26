@@ -49,6 +49,4 @@ public interface AccountTokenJpaRepository extends JpaRepository<AccountTokenEnt
     @Query("DELETE FROM AccountTokenEntity t WHERE t.expiresAt < :cutoff")
     int deleteExpiredBefore(@Param("cutoff") Instant cutoff);
 
-    boolean existsByAccountIdAndPurposeAndCreatedAtAfter(
-            UUID accountId, AccountTokenPurpose purpose, Instant createdAfter);
 }

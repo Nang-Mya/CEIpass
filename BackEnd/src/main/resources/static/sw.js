@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "chiang-rai-pass-shell-v3";
+const CACHE_NAME = "chiang-rai-pass-shell-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const APP_SHELL = [
   "./css/styles.css",
   "./js/config.js",
   "./js/app.js",
+  "./privacy.html",
   "./icons/pass-icon.svg"
 ];
 
@@ -40,7 +41,7 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request).catch(async () => {
-        const cachedPage = await caches.match("./index.html");
+        const cachedPage = (await caches.match(request)) || (await caches.match("./index.html"));
         if (cachedPage) return cachedPage;
         throw new Error("The offline app shell is unavailable.");
       })

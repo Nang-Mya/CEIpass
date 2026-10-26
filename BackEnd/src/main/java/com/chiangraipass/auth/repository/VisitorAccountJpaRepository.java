@@ -34,4 +34,15 @@ public interface VisitorAccountJpaRepository extends JpaRepository<VisitorAccoun
               AND account.accountStatus = 'ACTIVE'
             """)
     Optional<VisitorAccountEntity> findActiveForUpdate(@Param("email") String email);
+
+    @Query("""
+            SELECT account.securityToken
+            FROM VisitorAccountEntity account
+            WHERE account.accountId = :accountId
+              AND account.accountStatus = 'ACTIVE'
+            """)
+    Optional<String> findActiveSecurityToken(@Param("accountId") UUID accountId);
+
+    Optional<VisitorAccountEntity>
+        findByAccountIdAndAccountStatus(UUID accountId,String accountStatus);
 }

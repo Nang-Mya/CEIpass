@@ -40,10 +40,10 @@ class AccountTokenServiceTest {
 
     @Test
     void issuedTokenIsRedeemableOnceAndReturnsOwner() {
-        String token = service.issue(accountId, AccountTokenPurpose.VERIFY_EMAIL, HOUR);
+        String token = service.issue(accountId, AccountTokenPurpose.PASSWORD_RESET, HOUR);
 
-        assertThat(service.consume(token, AccountTokenPurpose.VERIFY_EMAIL)).contains(accountId);
-        assertThat(service.consume(token, AccountTokenPurpose.VERIFY_EMAIL)).isEmpty();
+        assertThat(service.consume(token, AccountTokenPurpose.PASSWORD_RESET)).contains(accountId);
+        assertThat(service.consume(token, AccountTokenPurpose.PASSWORD_RESET)).isEmpty();
     }
 
     @Test
@@ -55,14 +55,6 @@ class AccountTokenServiceTest {
                 .isEqualTo(AccountTokenService.hash(token))
                 .isNotEqualTo(token)
                 .hasSize(64);
-    }
-
-    @Test
-    void tokenCannotBeUsedForAnotherPurpose() {
-        String token = service.issue(accountId, AccountTokenPurpose.VERIFY_EMAIL, HOUR);
-
-        assertThat(service.consume(token, AccountTokenPurpose.PASSWORD_RESET)).isEmpty();
-        assertThat(service.consume(token, AccountTokenPurpose.VERIFY_EMAIL)).contains(accountId);
     }
 
     @Test
@@ -83,56 +75,35 @@ class AccountTokenServiceTest {
     }
 
     @Test
-    void differentPurposesDoNotInvalidateEachOther() {
-        String verify = service.issue(accountId, AccountTokenPurpose.VERIFY_EMAIL, HOUR);
-        service.issue(accountId, AccountTokenPurpose.PASSWORD_RESET, HOUR);
-
-        assertThat(service.consume(verify, AccountTokenPurpose.VERIFY_EMAIL)).contains(accountId);
-    }
-
-    @Test
     void unknownBlankAndOversizedTokensAreRejected() {
-        assertThat(service.consume("not-a-real-token", AccountTokenPurpose.VERIFY_EMAIL)).isEmpty();
-        assertThat(service.consume("  ", AccountTokenPurpose.VERIFY_EMAIL)).isEmpty();
-        assertThat(service.consume(null, AccountTokenPurpose.VERIFY_EMAIL)).isEmpty();
-        assertThat(service.consume("x".repeat(500), AccountTokenPurpose.VERIFY_EMAIL)).isEmpty();
+        assertThat(service.consume("not-a-real-token", AccountTokenPurpose.PASSWORD_RESET)).isEmpty();
+        assertThat(service.consume("  ", AccountTokenPurpose.PASSWORD_RESET)).isEmpty();
+        assertThat(service.consume(null, AccountTokenPurpose.PASSWORD_RESET)).isEmpty();
+        assertThat(service.consume("x".repeat(500), AccountTokenPurpose.PASSWORD_RESET)).isEmpty();
     }
 
     @Test
     void tokensAreUnique() {
-        String a = service.issue(accountId, AccountTokenPurpose.VERIFY_EMAIL, HOUR);
-        String b = service.issue(UUID.randomUUID(), AccountTokenPurpose.VERIFY_EMAIL, HOUR);
+        String a = service.issue(accountId, AccountTokenPurpose.PASSWORD_RESET, HOUR);
+        String b = service.issue(UUID.randomUUID(), AccountTokenPurpose.PASSWORD_RESET, HOUR);
 
         assertThat(a).isNotEqualTo(b);
     }
 
     @Test
     void nonPositiveLifetimeIsRejected() {
-        assertThatThrownBy(() -> service.issue(accountId, AccountTokenPurpose.VERIFY_EMAIL, Duration.ZERO))
+        assertThatThrownBy(() -> service.issue(accountId, AccountTokenPurpose.PASSWORD_RESET, Duration.ZERO))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     void purgeRemovesOnlyTokensExpiredBeyondRetention() {
-        service.issue(accountId, AccountTokenPurpose.VERIFY_EMAIL, HOUR);
+        service.issue(accountId, AccountTokenPurpose.PASSWORD_RESET, HOUR);
         clock.advance(Duration.ofDays(10));
         String fresh = service.issue(accountId, AccountTokenPurpose.PASSWORD_RESET, HOUR);
 
         assertThat(service.purgeExpired(Duration.ofDays(7))).isEqualTo(1);
         assertThat(service.consume(fresh, AccountTokenPurpose.PASSWORD_RESET)).contains(accountId);
-    }
-
-    @Test
-    void reportsWhetherATokenWasIssuedRecently() {
-        service.issue(accountId, AccountTokenPurpose.VERIFY_EMAIL, HOUR);
-
-        assertThat(service.issuedRecently(accountId, AccountTokenPurpose.VERIFY_EMAIL, Duration.ofMinutes(1))).isTrue();
-        assertThat(service.issuedRecently(accountId, AccountTokenPurpose.PASSWORD_RESET, Duration.ofMinutes(1))).isFalse();
-        assertThat(service.issuedRecently(UUID.randomUUID(), AccountTokenPurpose.VERIFY_EMAIL, Duration.ofMinutes(1))).isFalse();
-
-        clock.advance(Duration.ofMinutes(2));
-
-        assertThat(service.issuedRecently(accountId, AccountTokenPurpose.VERIFY_EMAIL, Duration.ofMinutes(1))).isFalse();
     }
 
     private static final class MutableClock extends Clock {
