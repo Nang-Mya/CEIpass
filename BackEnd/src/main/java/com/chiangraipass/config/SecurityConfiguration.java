@@ -22,6 +22,7 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -78,9 +79,10 @@ public class SecurityConfiguration {
             ObjectProvider<VisitorAccountService> accounts) throws Exception {
         http
                 .cors(Customizer.withDefaults())
+                .securityContext(context -> context.requireExplicitSave(false)) // Auto-syncs context to session[cite: 3]
                 .csrf(csrf -> csrf
-                        .csrfTokenRepository(csrfTokenRepository)
-                        .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
+                .csrfTokenRepository(csrfTokenRepository)
+                .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler()))
                 .authenticationProvider(authenticationProvider)
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
@@ -142,12 +144,20 @@ public class SecurityConfiguration {
         };
     }
 
-    private AuthenticationSuccessHandler jsonLoginSuccess(ObjectMapper mapper) {
-        return (request, response, authentication) -> {
+    private AuthenticationSuccessHandler jsonLoginSuccess(ObjectMapper mapper) { 
+        var repo = new org.springframework.security.web.context.HttpSessionSecurityContextRepository(); 
+        return (request, response, authentication) -> { 
+            // Explicitly initialize session and bind the authenticated security context 
+            var session = request.getSession(true); 
+            var ctx = SecurityContextHolder.createEmptyContext(); 
+            ctx.setAuthentication(authentication); 
+            SecurityContextHolder.setContext(ctx); 
+            repo.saveContext(ctx, request, response); 
+            
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.setHeader("Cache-Control", "no-store");
-            mapper.writeValue(response.getOutputStream(), accountResponse(authentication));
-        };
+            response.setHeader("Cache-Control", "no-store"); 
+            mapper.writeValue(response.getOutputStream(), accountResponse(authentication)); 
+        }; 
     }
 
     private AuthenticationFailureHandler jsonLoginFailure(ObjectMapper mapper) {
