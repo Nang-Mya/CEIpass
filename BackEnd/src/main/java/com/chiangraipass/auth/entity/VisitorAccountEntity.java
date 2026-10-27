@@ -232,4 +232,7 @@ public class VisitorAccountEntity {
         clearLoginFailures();
     }
 
+    public void changeDisplayName(String newDisplayName) {
+        this.displayName = newDisplayName;
+    }
 }

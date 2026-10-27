@@ -43,7 +43,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 new Rule("POST", "/api/v1/auth/password/forgot", 5, Duration.ofHours(1)),
                 new Rule("POST", "/api/v1/auth/password/verify-otp", 10, Duration.ofMinutes(10)),
                 new Rule("POST", "/api/v1/auth/password/reset", 20, Duration.ofMinutes(10)),
-                new Rule("POST", "/api/v1/me/privacy-preferences", 20, Duration.ofMinutes(10))
+                new Rule("POST", "/api/v1/me/privacy-preferences", 20, Duration.ofMinutes(10)),
+                new Rule("PATCH", "/api/v1/me/profile", 30, Duration.ofMinutes(10)),
+                new Rule("POST", "/api/v1/me/password", 10, Duration.ofMinutes(10)),
+                new Rule("PUT", "/api/v1/me/avatar", 10, Duration.ofMinutes(10))
         );
     }
 

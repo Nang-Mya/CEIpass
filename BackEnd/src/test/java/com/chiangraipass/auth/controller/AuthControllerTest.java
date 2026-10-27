@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
 import com.chiangraipass.auth.model.EmailVisitorPrincipal;
 import com.chiangraipass.auth.model.VisitorAccount;
@@ -135,6 +136,7 @@ class AuthControllerTest {
         VisitorAccount account = new VisitorAccount(
                 UUID.randomUUID(), email, "Chiang Rai Visitor", passwordEncoder.encode(password),null);
         given(userDetailsService.loadUserByUsername(email)).willReturn(new EmailVisitorPrincipal(account));
+        given(accountService.findById(account.accountId())).willReturn(Optional.of(account));
         given(accountService.findById(account.accountId())).willReturn(Optional.of(account));
         
         MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
@@ -300,7 +302,7 @@ class AuthControllerTest {
                         org.hamcrest.Matchers.containsString("locked for 10 minutes")));
     }
 
-        @Test
+    @Test
     void forgotPasswordGivesTheSameAnswerForAnyEmail() throws Exception {
         mockMvc.perform(post("/api/v1/auth/password/forgot")
                         .with(csrf())
@@ -390,6 +392,51 @@ class AuthControllerTest {
                         org.hamcrest.Matchers.containsString("has expired")));
     }
 
+    @Test
+    void forgotPasswordTellsHowLongToWaitWhileTheCooldownRuns() throws Exception {
+        given(passwordReset.requestOtp("visitor@example.com")).willReturn(42L);
+
+        mockMvc.perform(post("/api/v1/auth/password/forgot")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"email\":\"visitor@example.com\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "42"))
+                .andExpect(jsonPath("$.retryAfterSeconds").value(42))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("42 seconds")));
+    }
+
+    @Test
+    void forgotPasswordReportsTheCooldownThatStartsNow() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/password/forgot")
+                        .with(csrf())
+                        .contentType("application/json")
+                        .content("{\"email\":\"visitor@example.com\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.retryAfterSeconds").value(60));
+    }
+
+    @Test
+    void meRejectsASessionWhoseAccountNoLongerExists() throws Exception {
+        String email = "visitor@example.com";
+        String password = "Correct-horse-battery-1";
+        VisitorAccount account = new VisitorAccount(
+                UUID.randomUUID(), email, "Chiang Rai Visitor", passwordEncoder.encode(password));
+        given(userDetailsService.loadUserByUsername(email)).willReturn(new EmailVisitorPrincipal(account));
+        MvcResult login = mockMvc.perform(post("/api/v1/auth/login")
+                        .with(csrf())
+                        .contentType(APPLICATION_FORM_URLENCODED)
+                        .param("email", email)
+                        .param("password", password))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        given(accountService.findById(account.accountId())).willReturn(Optional.empty());
+
+        MockHttpSession session = (MockHttpSession) login.getRequest().getSession(false);
+        mockMvc.perform(get("/api/v1/auth/me").session(session))
+                .andExpect(status().isUnauthorized());
+    }
 //     @Test
 //     void csrfCookieTokenIsAcceptedInTheSpaRequestHeader() throws Exception {
 //         given(accountService.findByEmail("visitor@example.com")).willReturn(Optional.empty());

@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -31,6 +32,7 @@ import com.chiangraipass.auth.model.VisitorIdentity;
 import com.chiangraipass.auth.service.PasswordPolicy;
 import com.chiangraipass.auth.service.PasswordResetService;
 import com.chiangraipass.auth.service.VisitorAccountService;
+import com.chiangraipass.auth.service.OtpRequestCooldown;
 import com.chiangraipass.config.AuthProperties;
 import com.chiangraipass.config.OAuthPrivacyNoticeContext;
 
@@ -143,14 +145,23 @@ public class AuthController {
     }
 
     @PostMapping("/password/forgot")
-    public ResponseEntity<Map<String, String>> forgotPassword(
+    public ResponseEntity<Map<String, Object>> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
-        passwordReset.requestOtp(request.email());
+        long secondsToWait = passwordReset.requestOtp(request.email());
+        if (secondsToWait > 0) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                    .header(HttpHeaders.RETRY_AFTER, String.valueOf(secondsToWait))
+                    .cacheControl(CacheControl.noStore())
+                    .body(Map.<String, Object>of(
+                            "message", "Please wait " + secondsToWait + " seconds before requesting a new code.",
+                            "retryAfterSeconds", secondsToWait));
+        }
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(Map.of("message",
-                        "If that email belongs to an account, we have sent it a 6-digit code. "
-                                + "The code expires in 10 minutes."));
+                .body(Map.<String, Object>of(
+                        "message", "If that email belongs to an account, we have sent it a 6-digit code. "
+                                + "The code expires in 10 minutes.",
+                        "retryAfterSeconds", OtpRequestCooldown.COOLDOWN.toSeconds()));
     }
 
     @PostMapping("/password/verify-otp")

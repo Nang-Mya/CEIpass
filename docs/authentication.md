@@ -94,6 +94,11 @@ The application already sends a six-digit password-reset code to the account's e
 - `POST /api/v1/auth/oauth/prepare` validates provider setup, records the notice acknowledgement for a new OAuth account, and returns its authorization URL.
 - OAuth callbacks use Spring Security's state validation and OIDC token/signature validation; only verified provider emails are accepted.
 
+## Profile, password change and reset cooldown
+
+`GET /api/v1/auth/me` returns the signed-in visitor's current details from the database, including `hasPassword`. `PATCH /api/v1/me/profile` changes the display name. `PUT /api/v1/me/avatar` takes the raw bytes of a JPEG or PNG (up to 2 MB), decodes it and stores a 256 px square JPEG in `app.visitor_avatar`; `GET /api/v1/me/avatar` returns it (204 when none is set). `POST /api/v1/me/password` needs the current password, applies the registration password rules and refuses a new password equal to the current one; a wrong current password counts as a failed sign-in attempt, and a successful change signs out every other device while keeping the current one signed in.
+
+`POST /api/v1/auth/password/forgot` allows one request per email address per minute, whether or not the email has an account. A request inside the cooldown is answered with `429`, a `Retry-After` header and `retryAfterSeconds`, and nothing is sent. The cooldown is kept in memory per server instance.
 
 ## Before production
 

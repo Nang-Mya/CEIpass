@@ -32,7 +32,19 @@ spring:
       cookie:
         http-only: true
         secure: ${SESSION_COOKIE_SECURE:false}
-        same-site: lax
+        same-site: lax\
+  mail:
+    port: ${SPRING_MAIL_PORT:587}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 
 app:

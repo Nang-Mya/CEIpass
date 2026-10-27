@@ -89,4 +89,15 @@ public class VisitorAccountService {
             .findByAccountIdAndAccountStatus(accountId, ACTIVE)
             .map(VisitorAccountEntity::toAccount);
     }
+
+
+    @Transactional
+    public boolean updateDisplayName(UUID accountId, String displayName) {
+        return accounts.findByAccountIdAndAccountStatus(accountId, ACTIVE)
+                .map(account -> {
+                    account.changeDisplayName(displayName);
+                    return true;
+                })
+                .orElse(false);
+    }
 }

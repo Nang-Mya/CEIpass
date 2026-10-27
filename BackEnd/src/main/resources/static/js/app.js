@@ -22,6 +22,81 @@ const announcer = document.querySelector("#app-announcer");
 const apiBaseUrl = window.CEIPASS_CONFIG?.apiBaseUrl;
 let profileMode = "login";
 let resetEmail = "", resetToken = "";
+let otpCooldownUntil = 0, otpCooldownTimer = null;
+let avatarObjectUrl = "";
+
+const EYE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYE_OFF_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.7A10.5 10.5 0 0 1 12 5.5c6.4 0 10 6.5 10 6.5a17.6 17.6 0 0 1-3.2 4.1"/><path d="M6.5 6.9A17.3 17.3 0 0 0 2 12s3.6 6.5 10 6.5c1.5 0 2.8-.3 4-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`;
+const PROFILE_ICON = `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"></circle><path d="M5 20c.6-3.7 3-5.5 7-5.5s6.4 1.8 7 5.5"></path></svg>`;
+
+function setHeaderAvatar(url) {
+  const button = document.querySelector("#header-profile-button");
+  if (!button) return;
+  if (!url) {
+    button.innerHTML = PROFILE_ICON;
+    return;
+  }
+  const image = document.createElement("img");
+  image.className = "header-avatar-image";
+  image.alt = "";
+  image.src = url;
+  button.replaceChildren(image);
+}
+
+// Adds a show/hide button to every password field that appears on the page.
+function addPasswordToggles() {
+  appContent.querySelectorAll('input[type="password"]:not([data-has-toggle])').forEach((input) => {
+    input.dataset.hasToggle = "true";
+    const wrapper = document.createElement("span");
+    wrapper.className = "password-field";
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "password-toggle";
+    toggle.setAttribute("aria-label", "Show password");
+    toggle.setAttribute("aria-pressed", "false");
+    toggle.innerHTML = EYE_ICON;
+    wrapper.appendChild(toggle);
+  });
+}
+
+function otpRemainingSeconds() {
+  return Math.max(0, Math.ceil((otpCooldownUntil - Date.now()) / 1000));
+}
+
+// Keeps the "Resend OTP" button in step with the cooldown timer.
+function updateOtpButton() {
+  const left = otpRemainingSeconds();
+  const button = document.querySelector('[data-action="resend-otp"]');
+  if (button) {
+    const label = left > 0 ? `Resend OTP in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}` : "Resend OTP";
+    if (button.textContent !== label) button.textContent = label;
+    if (button.disabled !== left > 0) button.disabled = left > 0;
+  }
+  if (left <= 0 && otpCooldownTimer) { clearInterval(otpCooldownTimer); otpCooldownTimer = null; }
+}
+
+function startOtpCooldown(seconds) {
+  otpCooldownUntil = Date.now() + Math.max(1, Number(seconds) || 60) * 1000;
+  clearInterval(otpCooldownTimer);
+  otpCooldownTimer = setInterval(updateOtpButton, 1000);
+  updateOtpButton();
+}
+
+new MutationObserver(() => { addPasswordToggles(); updateOtpButton(); })
+  .observe(appContent, { childList: true, subtree: true });
+
+document.addEventListener("click", (event) => {
+  const toggle = event.target.closest(".password-toggle");
+  if (!toggle) return;
+  const input = toggle.parentElement.querySelector("input");
+  const show = input.type === "password";
+  input.type = show ? "text" : "password";
+  toggle.setAttribute("aria-pressed", String(show));
+  toggle.setAttribute("aria-label", show ? "Hide password" : "Show password");
+  toggle.innerHTML = show ? EYE_OFF_ICON : EYE_ICON;
+});
 let qrRefreshTimer;
 let profileFeedback = "";
 
@@ -61,11 +136,15 @@ async function requestJson(path, options = {}) {
   });
   if (!response.ok) {
     let message = `The service returned HTTP ${response.status}.`;
+    let retryAfterSeconds;
     try {
       const body = await response.json();
       if (typeof body.message === "string") message = body.message;
+      if (Number.isFinite(body.retryAfterSeconds)) retryAfterSeconds = body.retryAfterSeconds;
     } catch (e) {}
-    throw new ApiError(response.status, message);
+    const error = new ApiError(response.status, message);
+    if (retryAfterSeconds !== undefined) error.retryAfterSeconds = retryAfterSeconds;
+    throw error;
   }
   return response.json();
 }
@@ -118,7 +197,7 @@ function updateCartCount() {
 function announce(message) { announcer.textContent = message; }
 function currentPage() {
   const page = window.location.hash.slice(1).split("?")[0];
-  return ["home", "buy", "qr", "history", "profile","reset"].includes(page) ? page : "home";
+  return ["home", "buy", "qr", "history", "profile", "change-password", "reset"].includes(page) ? page : "home";
 }
 
 function pageHeading(eyebrow, title, description = "") {
@@ -489,16 +568,170 @@ document.addEventListener("click", async (event) => {
   } catch (e) { msg.textContent = e.message; button.disabled = false; }
 });
 
+function avatarMarkup(url) {
+  if (url) return `<img class="me-avatar-img" src="${url}" alt="Profile picture" width="64" height="64">`;
+  return `<svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="10.2"/><circle cx="12" cy="9.6" r="3.4"/><path d="M5.6 18.6c1.5-2.8 3.6-4.1 6.4-4.1s4.9 1.3 6.4 4.1"/></svg>`;
+}
+
+function settingsCard(account) {
+  const action = account.hasPassword
+    ? `<a class="button button-outline button-full settings-password-link" href="#change-password">Change password</a>`
+    : `<p class="me-muted">This account has no password to change.</p>`;
+  return `<div class="me-card"><h2 class="me-subtitle">Settings</h2>
+    ${action}</div>`;
+}
+
+async function loadAvatarUrl() {
+  if (avatarObjectUrl) { URL.revokeObjectURL(avatarObjectUrl); avatarObjectUrl = ""; }
+  const response = await fetch(apiUrl("/api/v1/me/avatar"), { credentials: "include", cache: "no-store", signal: AbortSignal.timeout(8000) });
+  if (response.status !== 200) return "";
+  avatarObjectUrl = URL.createObjectURL(await response.blob());
+  return avatarObjectUrl;
+}
+
+async function syncHeaderAvatar() {
+  try {
+    await requestJson("/api/v1/auth/me", { cache: "no-store" });
+    setHeaderAvatar(await loadAvatarUrl());
+  } catch (e) {
+    setHeaderAvatar("");
+  }
+}
+
+// Crops to a centred square and shrinks to 256 px, so uploads stay small and carry no photo metadata.
+async function resizeToJpeg(file, size = 256) {
+  let bitmap;
+  try { bitmap = await createImageBitmap(file); } catch (e) { throw new Error("That file could not be read as a picture."); }
+  const side = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement("canvas");
+  canvas.width = size; canvas.height = size;
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#fff"; context.fillRect(0, 0, size, size);
+  context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, size, size);
+  if (bitmap.close) bitmap.close();
+  return new Promise((resolve, reject) => canvas.toBlob(
+    (blob) => (blob ? resolve(blob) : reject(new Error("Could not process the picture."))), "image/jpeg", 0.85));
+}
+
+document.addEventListener("click", (event) => {
+  const control = event.target.closest("[data-profile-edit]");
+  if (!control) return;
+  const card = control.closest(".me-identity");
+  const form = card.querySelector("#edit-profile-form"), openButton = card.querySelector('[data-profile-edit="open"]');
+  const editing = control.dataset.profileEdit === "open";
+  form.hidden = !editing; openButton.hidden = editing;
+  if (editing) form.elements.displayName.focus(); else form.reset();
+});
+
+document.addEventListener("submit", async (event) => {
+  if (event.target.id !== "edit-profile-form") return;
+  event.preventDefault();
+  const form = event.target, msg = form.querySelector(".form-message"), btn = form.querySelector('[type="submit"]');
+  const name = form.elements.displayName.value.trim();
+  const file = form.elements.picture.files[0];
+  if (!name) { msg.textContent = "Name is required."; return; }
+  if (name.length > 120) { msg.textContent = "Name must be at most 120 characters."; return; }
+  if (/[\u0000-\u001f\u007f]/.test(name)) { msg.textContent = "Name contains characters that are not allowed."; return; }
+  if (file && !["image/jpeg", "image/png"].includes(file.type)) { msg.textContent = "Choose a JPEG or PNG picture."; return; }
+  if (file && file.size > 10 * 1024 * 1024) { msg.textContent = "The picture is too large. Choose one under 10 MB."; return; }
+  const nameChanged = name !== form.elements.displayName.defaultValue;
+  if (!file && !nameChanged) { msg.textContent = "Nothing has changed."; return; }
+  btn.disabled = true; msg.textContent = "Saving...";
+  try {
+    const csrf = await csrfHeaders();
+    if (file) {
+      const picture = await resizeToJpeg(file);
+      await requestJson("/api/v1/me/avatar", { method: "PUT", headers: { ...csrf, "Content-Type": "image/jpeg" }, body: picture });
+    }
+    if (nameChanged) {
+      await requestJson("/api/v1/me/profile", { method: "PATCH", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ displayName: name }) });
+    }
+    profileFeedback = "Profile updated."; await renderProfilePage();
+  } catch (e) { msg.textContent = e.message; btn.disabled = false; }
+});
+
+document.addEventListener("submit", async (event) => {
+  if (event.target.id !== "password-form") return;
+  event.preventDefault();
+  const form = event.target, msg = form.querySelector(".form-message"), btn = form.querySelector('[type="submit"]');
+  const current = form.elements.current.value, next = form.elements.password.value;
+  if (!current) { msg.textContent = "Enter your current password."; return; }
+  const problem = passwordProblem(next);
+  if (problem) { msg.textContent = problem; return; }
+  if (next !== form.elements.confirm.value) { msg.textContent = "The two new passwords do not match."; return; }
+  btn.disabled = true; msg.textContent = "Saving...";
+  try {
+    const csrf = await csrfHeaders();
+    const reply = await requestJson("/api/v1/me/password", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ currentPassword: current, newPassword: next }) });
+    profileFeedback = reply.message;
+    window.location.hash = "profile";
+  } catch (e) { msg.textContent = e.message; btn.disabled = false; }
+});
+
+function changePasswordPage(account, notice = "") {
+  if (!account.hasPassword) {
+    return `<section>${pageHeading("Your account", "Change password")}
+      <div class="profile-card"><p class="me-muted">This account has no password to change.</p>
+        <a class="button button-outline button-full" href="#profile">Back to profile</a></div></section>`;
+  }
+  return `<section>${pageHeading("Your account", "Change password", "Choose a new password for your account.")}
+    <div class="profile-card">
+      ${notice ? `<p class="form-message">${escapeHtml(notice)}</p>` : ""}
+      <form id="password-form" class="account-form" novalidate>
+        <label class="field-label">Current password</label><input name="current" type="password" required autocomplete="current-password">
+        <label class="field-label">New password</label><input name="password" type="password" required autocomplete="new-password">
+        <small>At least 8 characters, with at least 1 number and 1 special character (! @ # $ %). English letters only.</small>
+        <label class="field-label">Confirm new password</label><input name="confirm" type="password" required autocomplete="new-password">
+        <button type="submit" class="button button-dark button-full">Change password</button><p class="form-message"></p>
+        <a class="button button-outline button-full" href="#profile">Cancel</a>
+      </form>
+    </div></section>`;
+}
+
+async function renderChangePasswordPage() {
+  appContent.innerHTML = `<section>${pageHeading("Your account", "Loading...")}</section>`;
+  let account;
+  try {
+    account = await requestJson("/api/v1/auth/me", { cache: "no-store" });
+  } catch (e) {
+    if (currentPage() !== "change-password") return;
+    profileFeedback = "Please sign in to change your password.";
+    window.location.hash = "profile";
+    return;
+  }
+  if (currentPage() !== "change-password") return;
+  try { setHeaderAvatar(await loadAvatarUrl()); } catch (e) { setHeaderAvatar(""); }
+  appContent.innerHTML = changePasswordPage(account, profileFeedback);
+  profileFeedback = "";
+}
+
 function profilePage(authState) {
-    if (authState.account) {
+      if (authState.account) {
     const account = authState.account;
     return `<section>${pageHeading("Your account", "Profile")}
       ${authState.notice ? `<p class="form-message">${escapeHtml(authState.notice)}</p>` : ""}
       <div class="me-card me-identity">
-        <span class="me-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10.2"/><circle cx="12" cy="9.6" r="3.4"/><path d="M5.6 18.6c1.5-2.8 3.6-4.1 6.4-4.1s4.9 1.3 6.4 4.1"/></svg></span>
-        <span class="me-identity-text"><strong>${escapeHtml(account.displayName)}</strong><small>${escapeHtml(account.email)}</small></span>
+        <div class="me-identity-row">
+          <span class="me-avatar">${avatarMarkup(authState.avatarUrl)}</span>
+          <span class="me-identity-text">
+            <strong>${escapeHtml(account.displayName)}</strong>
+            <small>${escapeHtml(account.email)}</small>
+            <button type="button" class="button button-outline me-identity-edit" data-profile-edit="open">Edit Profile</button>
+          </span>
+        </div>
+        <form id="edit-profile-form" class="account-form" hidden novalidate>
+          <label class="field-label" for="edit-picture">Profile picture</label>
+          <input id="edit-picture" name="picture" type="file" accept="image/jpeg,image/png">
+          <small>JPEG or PNG. It is cropped to a square.</small>
+          <label class="field-label" for="edit-name">Display name</label>
+          <input id="edit-name" name="displayName" value="${escapeHtml(account.displayName)}" maxlength="120" required>
+          <button type="submit" class="button button-dark button-full">Save</button>
+          <button type="button" class="button button-outline button-full" data-profile-edit="cancel">Cancel</button>
+          <p class="form-message"></p>
+        </form>
       </div>
       ${myPassCard(authState)}
+      ${settingsCard(account)}
       ${privacyCard(authState)}
       <button type="button" class="button button-outline button-full" data-action="logout">Sign out</button></section>`;
   }
@@ -519,7 +752,7 @@ function profilePage(authState) {
         <label class="field-label">6-digit code</label><input name="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
         <button type="submit" class="button button-dark button-full">Verify code →</button><p class="form-message">${escapeHtml(authState.notice || "")}</p>
         <small>You can request a new code once a minute.</small>
-        <button type="button" class="button button-outline button-full" data-action="resend-otp">Send a new code</button>
+        <button type="button" class="button button-outline button-full" data-action="resend-otp">Resend OTP</button>
       </form></div></section>`;
   }
   if (profileMode === "newpass") {
@@ -570,6 +803,8 @@ async function renderProfilePage(loggedInAccount = null) {
 
   // 2. If logged in, fetch the pass (My Pass) and privacy settings to display on the Profile page
   if (authState.account) {
+    try { authState.avatarUrl = await loadAvatarUrl(); } catch (e) { authState.avatarUrl = ""; }
+    setHeaderAvatar(authState.avatarUrl);
     const [passResult, privacyResult] = await Promise.allSettled([
       requestJson("/api/v1/me/pass", { cache: "no-store" }),
       requestJson("/api/v1/me/privacy-preferences", { cache: "no-store" })
@@ -624,6 +859,7 @@ document.addEventListener("submit", async (event) => {
     if (id === "forgot-form") {
       resetEmail = form.elements.email.value.trim();
       const reply = await post("/api/v1/auth/password/forgot", { email: resetEmail });
+      startOtpCooldown(reply.retryAfterSeconds);
       profileMode = "otp"; profileFeedback = reply.message; await renderProfilePage(); return;
     }
     if (id === "otp-form") {
@@ -632,26 +868,40 @@ document.addEventListener("submit", async (event) => {
     }
     const reply = await post("/api/v1/auth/password/reset", { token: resetToken, newPassword: password });
     resetEmail = ""; resetToken = ""; profileMode = "login"; profileFeedback = reply.message; await renderProfilePage();
-  } catch (e) { msg.textContent = e.message; } finally { btn.disabled = false; }
+  } catch (e) {
+    if (id === "forgot-form" && e.status === 429 && Number.isFinite(e.retryAfterSeconds)) {
+      // A code was already requested for this email a moment ago: carry on to the code screen.
+      startOtpCooldown(e.retryAfterSeconds);
+      profileMode = "otp";
+      profileFeedback = "A code was sent to this email a moment ago. Enter it below, or request a new one when the timer ends.";
+      await renderProfilePage(); return;
+    }
+    msg.textContent = e.message;
+  } finally { btn.disabled = false; }
 });
 
 document.addEventListener("click", async (event) => {
   const button = event.target.closest('[data-action="resend-otp"]');
-  if (!button) return;
+  if (!button || otpRemainingSeconds() > 0) return;
   const msg = button.closest("form").querySelector(".form-message");
   button.disabled = true; msg.textContent = "Sending...";
   try {
     const csrf = await csrfHeaders();
     const reply = await requestJson("/api/v1/auth/password/forgot", { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify({ email: resetEmail }) });
+    startOtpCooldown(reply.retryAfterSeconds);
     msg.textContent = reply.message;
-  } catch (e) { msg.textContent = e.message; } finally { button.disabled = false; }
+  } catch (e) {
+    if (Number.isFinite(e.retryAfterSeconds)) startOtpCooldown(e.retryAfterSeconds);
+    msg.textContent = e.message;
+  } finally { updateOtpButton(); }
 });
 
 function setProfileMode(mode) { profileMode = mode === "register" ? "register" : mode === "forgot" ? "forgot" : "login"; if (profileMode !== "forgot") { resetEmail = ""; resetToken = ""; } profileFeedback = ""; render(); }
 
 async function render() {
   const page = currentPage();
-  document.querySelectorAll(".bottom-nav [data-page]").forEach(l => l.dataset.page === page ? l.setAttribute("aria-current", "page") : l.removeAttribute("aria-current"));
+  const navPage = page === "change-password" ? "profile" : page;
+  document.querySelectorAll(".bottom-nav [data-page]").forEach(l => l.dataset.page === navPage ? l.setAttribute("aria-current", "page") : l.removeAttribute("aria-current"));
   updateCartCount();
   if (!isCatalogLoaded && (page === "home" || page === "buy")) { appContent.innerHTML = `<div class="loading-panel">Loading...</div>`; await fetchCatalogData(); }
   switch (page) {
@@ -659,6 +909,7 @@ async function render() {
     case "qr": void renderQrPage(); break;
     case "history": void renderHistoryPage(); break;
     case "profile": void renderProfilePage(); break;
+    case "change-password": void renderChangePasswordPage(); break;
     case "reset": renderResetPage(); break;
     default: appContent.innerHTML = homePage();
   }
@@ -711,7 +962,7 @@ document.addEventListener("click", async (event) => {
     case "history-full": event.preventDefault(); await renderHistoryPage(true); break;
     case "history-recent": await renderHistoryPage(); break;
     case "logout":
-      try { const csrf = await csrfHeaders(); await fetch(apiUrl("/api/v1/auth/logout"), { method: "POST", headers: csrf, credentials: "include" }); try { await clearAllCachedQr(); localStorage.removeItem(LAST_QR_ACCOUNT_KEY); } catch (e) {} profileMode = "login"; profileFeedback = "Signed out."; render(); } catch (e) {} break;
+      try { const csrf = await csrfHeaders(); await fetch(apiUrl("/api/v1/auth/logout"), { method: "POST", headers: csrf, credentials: "include" }); setHeaderAvatar(""); if (avatarObjectUrl) { URL.revokeObjectURL(avatarObjectUrl); avatarObjectUrl = ""; } try { await clearAllCachedQr(); localStorage.removeItem(LAST_QR_ACCOUNT_KEY); } catch (e) {} profileMode = "login"; profileFeedback = "Signed out."; render(); } catch (e) {} break;
     case "refresh-qr": if (!control.disabled) await renderQrPage(); break;
     case "clear-qr-cache": let acc = localStorage.getItem(LAST_QR_ACCOUNT_KEY); if (acc) await clearCachedQr(acc); localStorage.removeItem(LAST_QR_ACCOUNT_KEY); if (currentPage() === "qr") await renderQrPage(); break;
     case "close-dialog": control.closest("dialog")?.close(); break;
@@ -754,11 +1005,12 @@ document.addEventListener("submit", async (event) => {
     if (currentPage() !== "profile") {
       window.location.hash = "#profile";
     }
-    await renderProfilePage(account);
+    await renderProfilePage();
   } catch (e) { msg.textContent = e.message; } finally { btn.disabled = false; }
 });
 
 window.addEventListener("hashchange", render);
+if (currentPage() !== "profile") void syncHeaderAvatar();
 render();
 
 // ฟังก์ชันสร้างหน้า Tourist Attraction แสดงการ์ดแนวตั้งทั้ง 5 สถานที่

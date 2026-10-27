@@ -45,4 +45,5 @@ public interface VisitorAccountJpaRepository extends JpaRepository<VisitorAccoun
 
     Optional<VisitorAccountEntity>
         findByAccountIdAndAccountStatus(UUID accountId,String accountStatus);
+
 }

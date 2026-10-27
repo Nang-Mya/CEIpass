@@ -14,9 +14,16 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.chiangraipass.pass.controller.PassQrController;
 import com.chiangraipass.privacy.controller.PrivacyPreferenceController;
+import com.chiangraipass.profile.controller.AvatarController;
 
 /** Returns the reason for a rejected auth request as {"message": "..."} so the UI can show it. */
-@RestControllerAdvice(assignableTypes = {AuthController.class, PrivacyPreferenceController.class, PassQrController.class})
+@RestControllerAdvice(assignableTypes = {
+        AuthController.class,
+        PrivacyPreferenceController.class,
+        PassQrController.class,
+        AvatarController.class,
+        ProfileController.class
+})
 public class AuthExceptionHandler {
 
     @ExceptionHandler(ResponseStatusException.class)
