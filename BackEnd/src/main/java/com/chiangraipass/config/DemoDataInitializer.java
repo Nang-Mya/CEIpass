@@ -50,7 +50,6 @@ public class DemoDataInitializer {
             if (account != null && dayPass != null && userPassRepository.count() == 0) {
                 // Create a demo payment
                 PaymentEntity payment = new PaymentEntity();
-                payment.setPaymentId(UUID.randomUUID());
                 payment.setAccount(account);
                 payment.setPass(dayPass);
                 payment.setPaymentMethod("PROTOTYPE_CHECKOUT");
@@ -60,7 +59,6 @@ public class DemoDataInitializer {
 
                 // Create a demo user pass
                 UserPassEntity userPass = new UserPassEntity();
-                userPass.setUserPassId(UUID.randomUUID());
                 userPass.setAccount(account);
                 userPass.setPass(dayPass);
                 userPass.setPayment(payment);
