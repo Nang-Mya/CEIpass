@@ -6,6 +6,7 @@ const QR_DATABASE_NAME = "cei-pass-private-cache";
 const QR_STORE_NAME = "issued-qr";
 const QR_ENDPOINT = "/api/v1/me/qr";
 const HISTORY_ENDPOINT = "/api/v1/me/usage-history";
+const PASS_SUMMARY_ENDPOINT = "/api/v1/me/pass-summary";
 const PASSES_ENDPOINT = "/api/v1/catalog/passes";
 const ATTRACTIONS_ENDPOINT = "/api/v1/catalog/attractions";
 const CHECKOUT_ENDPOINT = "/api/v1/me/orders";
@@ -313,12 +314,85 @@ function formatDate(value) {
   const d = new Date(value); return Number.isFinite(d.getTime()) ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(d) : "N/A";
 }
 
-async function renderHistoryPage() {
-  appContent.innerHTML = `<section>${pageHeading("Your visits", "Pass history", "Loading...")}</section>`;
+function historyListMarkup(history) {
+  if (history.length === 0) return `<div class="empty-state"><h2>No visits yet</h2></div>`;
+  const rows = history.map((item) => {
+    const success = item.status === "VALID_SUCCESS";
+    const quotaFailure = item.status === "QUOTA_EXCEEDED" || item.status === "QUOTA_USED";
+    const label = success ? "Success" : quotaFailure ? "Quota Used" : escapeHtml(item.status);
+    return `<article class="history-item">
+      <div class="history-item-copy"><h3>${escapeHtml(item.attractionName)}</h3><p>${escapeHtml(item.passName)}</p><time>${escapeHtml(formatDate(item.usedAt))}</time></div>
+      <span class="me-badge ${success ? "is-available" : "is-used"}">${label}</span>
+    </article>`;
+  }).join("");
+  return `<div class="history-list">${rows}</div>`;
+}
+
+function historyPassRemaining(pass) {
+  if (pass.status === "EXPIRED") return "Expired";
+  if (pass.status !== "ACTIVE" || !pass.endsAt) return "-";
+  const hoursLeft = Math.floor((new Date(pass.endsAt).getTime() - Date.now()) / 3600000);
+  if (!(hoursLeft > 0)) return "Expired";
+  const days = Math.floor(hoursLeft / 24);
+  const hours = hoursLeft % 24;
+  return `${days} ${days === 1 ? "Day" : "Days"} ${hours} ${hours === 1 ? "Hour" : "Hours"}`;
+}
+
+function historyOverviewMarkup(account, summary) {
+  const pass = summary.pass;
+  const passCard = pass
+    ? `<article class="history-pass-card">
+        <div class="history-pass-head">
+          <h2>${escapeHtml(pass.passName)}</h2>
+          <span class="me-status ${pass.status === "ACTIVE" ? "is-active" : ""}">${escapeHtml(pass.status)}</span>
+        </div>
+        <div class="history-pass-detail">
+          <p class="history-remaining-label">Remaining time</p>
+          <strong class="history-remaining">${escapeHtml(historyPassRemaining(pass))}</strong>
+          <p class="history-validity">Valid: ${escapeHtml(formatPassDate(pass.startDate))} - ${escapeHtml(formatPassDate(pass.endDate))}</p>
+        </div>
+      </article>`
+    : `<div class="empty-state"><h2>No active pass yet</h2></div>`;
+  const benefits = summary.benefits.length
+    ? `<ul class="me-benefits">${summary.benefits.map((benefit) => {
+        const used = benefit.used >= benefit.limit;
+        return `<li class="me-benefit"><span><strong>${escapeHtml(benefit.attractionName)}</strong><small>${escapeHtml(benefit.detail)}</small></span>
+          <span class="me-badge ${used ? "is-used" : "is-available"}">${used ? "Used" : "Available"} (${escapeHtml(benefit.used)}/${escapeHtml(benefit.limit)})</span></li>`;
+      }).join("")}</ul>`
+    : `<div class="empty-state"><h2>No active pass yet</h2></div>`;
+
+  return `<section class="history-page">
+    ${pageHeading("Your visits", "Pass history")}
+    <article class="me-card me-identity history-profile"><strong>${escapeHtml(account.displayName)}</strong></article>
+    ${passCard}
+    <section class="me-card history-section"><h2 class="me-subtitle">Pass Benefits &amp; Quota</h2>${benefits}</section>
+    <section class="me-card history-section">
+      <h2 class="me-subtitle">Check-in History</h2>
+      ${historyListMarkup(summary.recentUsage)}
+      <a class="me-link history-full-link" href="#history" data-action="history-full">View Full Usage History →</a>
+    </section>
+  </section>`;
+}
+
+async function renderHistoryPage(showFullHistory = false) {
+  const heading = showFullHistory ? "Full Usage History" : "Pass history";
+  appContent.innerHTML = `<section>${pageHeading("Your visits", heading, "Loading...")}</section>`;
   try {
-    const history = await requestJson(HISTORY_ENDPOINT);
-    if (history.length === 0) appContent.innerHTML = `<section>${pageHeading("Your visits", "Pass history")}<div class="empty-state"><h2>No visits yet</h2></div></section>`;
-    else appContent.innerHTML = `<section>${pageHeading("Your visits", "Pass history")}<div class="history-list">${history.map(e => `<article class="history-item"><div><h2>${escapeHtml(e.attractionName)}</h2><p>${escapeHtml(e.passName)}</p><time>${formatDate(e.usedAt)}</time></div></article>`).join("")}</div></section>`;
+    if (showFullHistory) {
+      const history = await requestJson(HISTORY_ENDPOINT, { cache: "no-store" });
+      appContent.innerHTML = `<section class="history-page">
+        ${pageHeading("Your visits", heading)}
+        <button type="button" class="button button-outline history-back" data-action="history-recent">Back</button>
+        ${historyListMarkup(history)}
+      </section>`;
+      return;
+    }
+
+    const [account, summary] = await Promise.all([
+      requestJson("/api/v1/auth/me", { cache: "no-store" }),
+      requestJson(PASS_SUMMARY_ENDPOINT, { cache: "no-store" })
+    ]);
+    appContent.innerHTML = historyOverviewMarkup(account, summary);
   } catch (error) {
     if (error.status === 401) appContent.innerHTML = `<section>${pageHeading("Your visits", "Pass history")}<div class="empty-state"><h2>Sign in required</h2></div></section>`;
     else appContent.innerHTML = `<section>${pageHeading("Your visits", "Pass history")}<div class="empty-state"><h2>History unavailable</h2></div></section>`;
@@ -634,6 +708,8 @@ document.addEventListener("click", async (event) => {
       } catch (e) { showNotice("Checkout Failed", e.message || "Please sign in to complete checkout."); control.disabled = false; control.innerHTML = `Confirm & Checkout <span aria-hidden="true">→</span>`; }
       break;
     case "profile-mode": setProfileMode(control.dataset.mode); break;
+    case "history-full": event.preventDefault(); await renderHistoryPage(true); break;
+    case "history-recent": await renderHistoryPage(); break;
     case "logout":
       try { const csrf = await csrfHeaders(); await fetch(apiUrl("/api/v1/auth/logout"), { method: "POST", headers: csrf, credentials: "include" }); try { await clearAllCachedQr(); localStorage.removeItem(LAST_QR_ACCOUNT_KEY); } catch (e) {} profileMode = "login"; profileFeedback = "Signed out."; render(); } catch (e) {} break;
     case "refresh-qr": if (!control.disabled) await renderQrPage(); break;

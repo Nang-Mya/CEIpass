@@ -857,6 +857,121 @@ attraction-art {
   color: #526653;
 }
 
+.history-page {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.history-page .page-heading {
+  margin-bottom: 0;
+}
+
+.history-profile {
+  margin-bottom: 0;
+  background: #fff;
+}
+
+.history-profile strong {
+  color: #20231f;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.history-pass-card {
+  display: grid;
+  margin-bottom: 0;
+  padding: 1rem;
+  gap: 0.85rem;
+  border: 1px solid #d6dfd4;
+  border-radius: 1.1rem;
+  background: #244b34;
+  color: #fff;
+}
+
+.history-pass-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.history-pass-head h2 {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.history-pass-detail {
+  padding: 1rem;
+  border-radius: 0.85rem;
+  background: #fff;
+  color: #20231f;
+}
+
+.history-remaining-label {
+  margin: 0;
+  color: #768075;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.history-remaining {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.1rem;
+}
+
+.history-validity {
+  margin: 0.45rem 0 0;
+  color: #526653;
+  font-size: 0.7rem;
+}
+
+.history-section {
+  margin-bottom: 0;
+  background: #fff;
+}
+
+.history-section .me-subtitle {
+  margin-top: 0;
+}
+
+.history-section .empty-state {
+  padding: 0.75rem 0;
+}
+
+.history-item {
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.history-item-copy {
+  min-width: 0;
+}
+
+.history-item h3 {
+  margin: 0;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.history-item .me-badge {
+  flex: 0 0 auto;
+}
+
+.history-full-link {
+  display: block;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.history-back {
+  justify-self: start;
+  margin-bottom: 0.25rem;
+}
+
 .profile-card {
   padding: 1.15rem;
   border: 1px solid #e6e8df;
@@ -1456,6 +1571,16 @@ attraction-art {
   }
 }
 
+@media (max-width: 380px) {
+  .history-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .history-pass-detail {
+    padding: 0.8rem;
+  }
+}
 
 /* ===== PROFILE PAGE ===== */
 .me-card {
