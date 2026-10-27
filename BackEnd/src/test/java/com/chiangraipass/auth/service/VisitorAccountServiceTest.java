@@ -63,5 +63,19 @@ class VisitorAccountServiceTest {
         assertThat(service.changePassword(UUID.randomUUID(), "new-hash")).isFalse();
     }
 
+    @Test
+    void updatesTheDisplayNameOfAnActiveAccount() {
+        VisitorAccountEntity account = saveAccount();
+
+        assertThat(service.updateDisplayName(account.getAccountId(), "New Name")).isTrue();
+
+        assertThat(service.findById(account.getAccountId()))
+                .hasValueSatisfying(found -> {
+                    assertThat(found.displayName()).isEqualTo("New Name");
+                    assertThat(found.passwordHash()).isNotNull();
+                });
+        assertThat(service.updateDisplayName(UUID.randomUUID(), "Nobody")).isFalse();
+        assertThat(service.findById(UUID.randomUUID())).isEmpty();
+    }
     
 }
