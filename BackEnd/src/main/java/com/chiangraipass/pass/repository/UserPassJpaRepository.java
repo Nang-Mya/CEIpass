@@ -16,4 +16,6 @@ public interface UserPassJpaRepository extends JpaRepository<UserPassEntity, UUI
             ORDER BY up.purchaseDatetime DESC
             """)
     List<UserPassEntity> findByAccountIdWithPass(@Param("accountId") UUID accountId);
+
+    List<UserPassEntity> findByAccount_AccountIdOrderByPurchaseDatetimeDesc(UUID accountId);
 }
