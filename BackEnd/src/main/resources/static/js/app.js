@@ -153,8 +153,17 @@ function homePage() {
       <a class="quick-card" href="#buy"><span class="quick-icon quick-icon-green" aria-hidden="true">🎟️</span><span><strong>Buy a pass</strong><small>Find your way to more</small></span></a>
       <a class="quick-card" href="#qr"><span class="quick-icon quick-icon-amber" aria-hidden="true">📱</span><span><strong>My QR pass</strong><small>Ready when you are</small></span></a>
     </section>
-    <section class="section-block"><div class="section-title-row"><div><p class="eyebrow">Hand-picked for you</p><h2>Explore Chiang Rai</h2></div></div>
-    <div class="attraction-list">${featured}</div></section></section>`;
+    <section class="section-block">
+      <!-- ปุ่ม > ลิงก์ไปยัง #attractions -->
+      <div class="section-title-row-link">
+        <div><p class="eyebrow">Hand-picked for you</p><h2>Explore Chiang Rai</h2></div>
+        <a href="#attractions" class="explore-link-btn" aria-label="See all tourist attractions">
+          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </a>
+      </div>
+      <div class="attraction-list">${featured}</div>
+    </section>
+  </section>`;
 }
 
 function cartDetails() {
@@ -751,3 +760,52 @@ document.addEventListener("submit", async (event) => {
 
 window.addEventListener("hashchange", render);
 render();
+
+// ฟังก์ชันสร้างหน้า Tourist Attraction แสดงการ์ดแนวตั้งทั้ง 5 สถานที่
+function touristAttractionsPage() {
+  if (catalogLoadError || (isCatalogLoaded && attractions.length === 0)) {
+    return `<section class="home-page">${emptyCatalogState()}</section>`;
+  }
+
+  const verticalList = attractions.map((item) => {
+    // รองรับทั้งแบบ camelCase (imageUrl) และ snake_case (image_url)
+    const imgPath = item.imageUrl || item.image_url;
+    
+    const imageHtml = imgPath 
+      ? `<img src="${escapeHtml(imgPath)}" alt="${escapeHtml(item.name || item.publicName)}" class="attraction-horizontal-img" onerror="this.onerror=null; this.parentNode.innerHTML='<div class=\\'attraction-horizontal-placeholder\\'>${item.initials || 'TR'}</div>';">`
+      : `<div class="attraction-horizontal-placeholder">${item.initials || 'TR'}</div>`;
+
+    return `<article class="attraction-horizontal-card">
+      <div class="attraction-horizontal-art">
+        ${imageHtml}
+      </div>
+      <div class="attraction-horizontal-info">
+        <p class="card-kicker">${escapeHtml(item.category || "ATTRACTION")} • ${escapeHtml(item.location || "")}</p>
+        <h3>${escapeHtml(item.name || item.publicName)}</h3>
+        <p>${escapeHtml(item.description)}</p>
+      </div>
+    </article>`;
+  }).join("");
+
+  return `<section class="home-page">
+    <div class="attraction-page-header">
+      <a href="#home" class="back-circle-btn" aria-label="Back to home">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </a>
+      <h1>Tourist Attraction</h1>
+    </div>
+    <div class="attractions-vertical-list">
+      ${verticalList}
+    </div>
+  </section>`;
+}
+
+// Event Listener สำหรับสลับเปิดหน้า Tourist Attraction เมื่อ URL เป็น #attractions
+window.addEventListener("hashchange", () => {
+  if (window.location.hash === "#attractions") {
+    fetchCatalogData().then(() => {
+      appContent.innerHTML = touristAttractionsPage();
+      window.scrollTo(0, 0);
+    });
+  }
+});
