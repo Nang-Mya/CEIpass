@@ -53,13 +53,18 @@ public class PassSummaryService {
         UserPassEntity userPass = current.get();
         Instant endsAt = userPass.getEndDate() == null
                 ? null
-                : userPass.getEndDate().plusDays(1).atStartOfDay(ZONE).toInstant();
+                : userPass.getEndDate().atTime(23, 59, 59).atZone(ZONE).toInstant();
+        Instant startsAt = userPass.getStartDate() == null
+                ? null
+                : userPass.getStartDate().atStartOfDay(ZONE).toInstant();
         PassInfo info = new PassInfo(
                 userPass.getPass().getDisplayName(),
                 effectiveStatus(userPass, today),
                 userPass.getStartDate(),
                 userPass.getEndDate(),
-                endsAt);
+                endsAt,
+                displayStatus(userPass, today),
+                startsAt);
 
         Map<String, Long> used = new HashMap<>();
         for (Object[] row : usageLogs.countSuccessfulUsageByBenefit(userPass.getUserPassId())) {
@@ -96,5 +101,16 @@ public class PassSummaryService {
             return "EXPIRED";
         }
         return userPass.getStatus();
+    }
+
+    private String displayStatus(UserPassEntity userPass, LocalDate today) {
+        if (userPass.getStartDate() == null || userPass.getEndDate() == null
+                || today.isBefore(userPass.getStartDate())) {
+            return "NOT STARTED";
+        }
+        if (today.isAfter(userPass.getEndDate())) {
+            return "EXPIRED";
+        }
+        return "ACTIVE";
     }
 }

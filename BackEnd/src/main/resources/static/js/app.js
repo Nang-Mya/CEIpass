@@ -408,13 +408,18 @@ function historyListMarkup(history) {
 }
 
 function historyPassRemaining(pass) {
-  if (pass.status === "EXPIRED") return "Expired";
-  if (pass.status !== "ACTIVE" || !pass.endsAt) return "-";
-  const hoursLeft = Math.floor((new Date(pass.endsAt).getTime() - Date.now()) / 3600000);
-  if (!(hoursLeft > 0)) return "Expired";
+  if (pass.displayStatus === "EXPIRED") return "Expired";
+  const notStarted = pass.displayStatus === "NOT STARTED";
+  const target = notStarted ? pass.startsAt : pass.endsAt;
+  if (!target || !["ACTIVE", "NOT STARTED"].includes(pass.displayStatus)) return "-";
+  const remainingMs = new Date(target).getTime() - Date.now();
+  if (!notStarted && remainingMs <= 0) return "0 Days 0 Hours";
+  if (notStarted && remainingMs <= 0) return "Starts in 0 Days 0 Hours";
+  const hoursLeft = Math[notStarted ? "ceil" : "floor"](remainingMs / 3600000);
   const days = Math.floor(hoursLeft / 24);
   const hours = hoursLeft % 24;
-  return `${days} ${days === 1 ? "Day" : "Days"} ${hours} ${hours === 1 ? "Hour" : "Hours"}`;
+  const remaining = `${days} ${days === 1 ? "Day" : "Days"} ${hours} ${hours === 1 ? "Hour" : "Hours"}`;
+  return notStarted ? `Starts in ${remaining}` : remaining;
 }
 
 function historyOverviewMarkup(account, summary) {
@@ -423,7 +428,7 @@ function historyOverviewMarkup(account, summary) {
     ? `<article class="history-pass-card">
         <div class="history-pass-head">
           <h2>${escapeHtml(pass.passName)}</h2>
-          <span class="me-status ${pass.status === "ACTIVE" ? "is-active" : ""}">${escapeHtml(pass.status)}</span>
+        <span class="me-status history-pass-status ${pass.displayStatus === "ACTIVE" ? "is-active" : pass.displayStatus === "EXPIRED" ? "is-expired" : "is-not-started"}">${escapeHtml(pass.displayStatus)}</span>
         </div>
         <div class="history-pass-detail">
           <p class="history-remaining-label">Remaining time</p>

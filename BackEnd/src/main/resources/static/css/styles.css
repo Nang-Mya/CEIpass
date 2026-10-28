@@ -915,6 +915,16 @@ attraction-art {
   overflow-wrap: anywhere;
 }
 
+.history-pass-status.is-expired {
+  background: #f7eae3;
+  color: #a4513b;
+}
+
+.history-pass-status.is-not-started {
+  background: #fff3d6;
+  color: #805a16;
+}
+
 .history-pass-detail {
   padding: 1rem;
   border-radius: 0.85rem;

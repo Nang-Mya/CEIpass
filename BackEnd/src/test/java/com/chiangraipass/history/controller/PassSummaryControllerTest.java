@@ -52,7 +52,7 @@ class PassSummaryControllerTest {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Bangkok");
     private static final Set<String> PASS_KEYS =
-            Set.of("passName", "status", "startDate", "endDate", "endsAt");
+            Set.of("passName", "status", "startDate", "endDate", "endsAt", "displayStatus", "startsAt");
     private static final Set<String> BENEFIT_KEYS =
             Set.of("attractionName", "detail", "used", "limit");
     private static final Set<String> USAGE_KEYS =
@@ -123,16 +123,20 @@ class PassSummaryControllerTest {
         JsonNode passInfo = response.get("pass");
         assertEquals("Active Sample Pass", passInfo.get("passName").asText());
         assertEquals("ACTIVE", passInfo.get("status").asText());
+        assertEquals("ACTIVE", passInfo.get("displayStatus").asText());
         assertEquals(today.minusDays(1).toString(), passInfo.get("startDate").asText());
         assertEquals(today.plusDays(1).toString(), passInfo.get("endDate").asText());
-        assertNotNull(passInfo.get("endsAt"));
+        assertEquals(today.plusDays(1).atTime(23, 59, 59).atZone(ZONE).toInstant().toString(),
+                passInfo.get("endsAt").asText());
+        assertEquals(today.minusDays(1).atStartOfDay(ZONE).toInstant().toString(),
+                passInfo.get("startsAt").asText());
         assertEquals(2, response.get("benefits").size());
-        assertEquals("Attraction One", response.get("benefits").get(0).get("attractionName").asText());
-        assertEquals(1, response.get("benefits").get(0).get("used").asInt());
-        assertEquals(1, response.get("benefits").get(0).get("limit").asInt());
-        assertEquals("Attraction Two", response.get("benefits").get(1).get("attractionName").asText());
-        assertEquals(1, response.get("benefits").get(1).get("used").asInt());
-        assertEquals(2, response.get("benefits").get(1).get("limit").asInt());
+        JsonNode benefitOneResult = benefitForAttraction(response.get("benefits"), "Attraction One");
+        assertEquals(1, benefitOneResult.get("used").asInt());
+        assertEquals(1, benefitOneResult.get("limit").asInt());
+        JsonNode benefitTwoResult = benefitForAttraction(response.get("benefits"), "Attraction Two");
+        assertEquals(1, benefitTwoResult.get("used").asInt());
+        assertEquals(2, benefitTwoResult.get("limit").asInt());
 
         JsonNode recentUsage = response.get("recentUsage");
         assertEquals(3, recentUsage.size());
@@ -160,6 +164,34 @@ class PassSummaryControllerTest {
         JsonNode response = getSummary(visitor);
 
         assertEquals("EXPIRED", response.get("pass").get("status").asText());
+        assertEquals("EXPIRED", response.get("pass").get("displayStatus").asText());
+    }
+
+    @Test
+    void futurePassIsNotStartedUntilItsStartDate() throws Exception {
+        VisitorFixture visitor = createVisitor("future");
+        LocalDate today = LocalDate.now(ZONE);
+        createPass(visitor, "Future Sample Pass", "ACTIVE", today.plusDays(1), today.plusDays(2), Instant.now());
+
+        JsonNode response = getSummary(visitor);
+        JsonNode passInfo = response.get("pass");
+
+        assertEquals("ACTIVE", passInfo.get("status").asText());
+        assertEquals("NOT STARTED", passInfo.get("displayStatus").asText());
+        assertEquals(today.plusDays(1).atStartOfDay(ZONE).toInstant().toString(),
+                passInfo.get("startsAt").asText());
+    }
+
+    @Test
+    void passWithMissingDatesIsNotStarted() throws Exception {
+        VisitorFixture visitor = createVisitor("missing-dates");
+        createPass(visitor, "Undated Sample Pass", "UNACTIVATED", null, null, Instant.now());
+
+        JsonNode passInfo = getSummary(visitor).get("pass");
+
+        assertEquals("NOT STARTED", passInfo.get("displayStatus").asText());
+        org.junit.jupiter.api.Assertions.assertTrue(passInfo.get("startsAt").isNull());
+        org.junit.jupiter.api.Assertions.assertTrue(passInfo.get("endsAt").isNull());
     }
 
     @Test
@@ -202,6 +234,15 @@ class PassSummaryControllerTest {
                 .andExpect(status().isOk())
                 .andReturn();
         return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
+    private JsonNode benefitForAttraction(JsonNode benefits, String attractionName) {
+        for (JsonNode benefit : benefits) {
+            if (attractionName.equals(benefit.get("attractionName").asText())) {
+                return benefit;
+            }
+        }
+        throw new AssertionError("Benefit for " + attractionName + " was not returned");
     }
 
     private VisitorFixture createVisitor(String label) {
