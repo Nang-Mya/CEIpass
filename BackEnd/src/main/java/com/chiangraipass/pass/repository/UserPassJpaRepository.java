@@ -2,6 +2,7 @@ package com.chiangraipass.pass.repository;
 
 import com.chiangraipass.pass.entity.UserPassEntity;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -18,4 +19,6 @@ public interface UserPassJpaRepository extends JpaRepository<UserPassEntity, UUI
     List<UserPassEntity> findByAccountIdWithPass(@Param("accountId") UUID accountId);
 
     List<UserPassEntity> findByAccount_AccountIdOrderByPurchaseDatetimeDesc(UUID accountId);
+
+    Optional<UserPassEntity> findByUserPassIdAndAccount_AccountId(UUID userPassId, UUID accountId);
 }

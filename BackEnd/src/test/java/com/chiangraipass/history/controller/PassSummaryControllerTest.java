@@ -228,6 +228,85 @@ class PassSummaryControllerTest {
         assertEquals(0, response.get("recentUsage").size());
     }
 
+    @Test
+    void passesEndpointReturnsEmptyListWhenVisitorHasNoPasses() throws Exception {
+        VisitorFixture visitor = createVisitor("no-passes");
+
+        MvcResult result = mockMvc.perform(get("/api/v1/me/passes")
+                        .with(visitorAuthentication(visitor.accountId(), visitor.email())))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        assertEquals(0, objectMapper.readTree(result.getResponse().getContentAsString()).size());
+    }
+
+    @Test
+    void passesEndpointSortsByPurchaseAndKeepsBenefitsAndUsagePerPass() throws Exception {
+        VisitorFixture visitor = createVisitor("multiple-passes");
+        LocalDate today = LocalDate.now(ZONE);
+        Instant earlierPurchase = Instant.now().minusSeconds(3600);
+        Instant laterPurchase = Instant.now();
+        PassFixture earlier = createPass(
+                visitor, "Earlier Pass", "ACTIVE", today, today.plusDays(1), earlierPurchase);
+        PassFixture later = createPass(
+                visitor, "Later Pass", "ACTIVE", today, today.plusDays(2), laterPurchase);
+        BenefitEntity earlierBenefit = createBenefit(earlier, "Earlier Attraction", "Earlier detail", 1);
+        BenefitEntity laterBenefit = createBenefit(later, "Later Attraction", "Later detail", 2);
+        createUsage(earlier.userPass(), earlier.attractions().get(0), earlierBenefit,
+                "VALID_SUCCESS", Instant.parse("2026-03-01T10:00:00Z"));
+        createUsage(earlier.userPass(), earlier.attractions().get(0), earlierBenefit,
+                "QUOTA_EXCEEDED", Instant.parse("2026-03-01T11:00:00Z"));
+        createUsage(later.userPass(), later.attractions().get(0), laterBenefit,
+                "VALID_SUCCESS", Instant.parse("2026-03-02T10:00:00Z"));
+        usageLogRepository.flush();
+
+        MvcResult result = mockMvc.perform(get("/api/v1/me/passes")
+                        .with(visitorAuthentication(visitor.accountId(), visitor.email())))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode passes = objectMapper.readTree(result.getResponse().getContentAsString());
+
+        assertEquals(2, passes.size());
+        assertEquals(earlier.userPass().getUserPassId().toString(), passes.get(0).get("userPassId").asText());
+        assertEquals("Earlier Pass", passes.get(0).get("passName").asText());
+        assertEquals(earlierPurchase.toString(), passes.get(0).get("purchaseDatetime").asText());
+        assertEquals("Earlier Attraction", passes.get(0).get("benefits").get(0).get("attractionName").asText());
+        assertEquals(1, passes.get(0).get("benefits").get(0).get("used").asInt());
+        assertEquals(2, passes.get(0).get("recentUsage").size());
+        assertEquals("Earlier Pass", passes.get(0).get("recentUsage").get(0).get("passName").asText());
+        assertEquals("QUOTA_EXCEEDED", passes.get(0).get("recentUsage").get(0).get("status").asText());
+        assertEquals("Earlier Attraction", passes.get(0).get("recentUsage").get(0).get("attractionName").asText());
+        assertEquals(Instant.parse("2026-03-01T11:00:00Z").toString(),
+                passes.get(0).get("recentUsage").get(0).get("usedAt").asText());
+        assertOnlyKeys(passes.get(0).get("recentUsage").get(0), USAGE_KEYS);
+        assertEquals(later.userPass().getUserPassId().toString(), passes.get(1).get("userPassId").asText());
+        assertEquals(laterPurchase.toString(), passes.get(1).get("purchaseDatetime").asText());
+        assertEquals("Later Attraction", passes.get(1).get("benefits").get(0).get("attractionName").asText());
+        assertEquals(1, passes.get(1).get("benefits").get(0).get("used").asInt());
+        assertEquals(2, passes.get(1).get("benefits").get(0).get("limit").asInt());
+        assertEquals(1, passes.get(1).get("recentUsage").size());
+        assertEquals("Later Pass", passes.get(1).get("recentUsage").get(0).get("passName").asText());
+        assertEquals("Later Attraction", passes.get(1).get("recentUsage").get(0).get("attractionName").asText());
+        assertOnlyKeys(passes.get(1).get("recentUsage").get(0), USAGE_KEYS);
+    }
+
+    @Test
+    void passesEndpointDoesNotExposeAnotherVisitorsPass() throws Exception {
+        VisitorFixture owner = createVisitor("pass-owner");
+        VisitorFixture other = createVisitor("pass-other");
+        PassFixture privatePass = createPass(
+                owner, "Private Pass", "ACTIVE", LocalDate.now(ZONE), LocalDate.now(ZONE).plusDays(1), Instant.now());
+
+        MvcResult result = mockMvc.perform(get("/api/v1/me/passes")
+                        .with(visitorAuthentication(other.accountId(), other.email())))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode passes = objectMapper.readTree(result.getResponse().getContentAsString());
+
+        assertEquals(0, passes.size());
+        assertNotNull(privatePass.userPass().getUserPassId());
+    }
+
     private JsonNode getSummary(VisitorFixture visitor) throws Exception {
         MvcResult result = mockMvc.perform(get("/api/v1/me/pass-summary")
                         .with(visitorAuthentication(visitor.accountId(), visitor.email())))

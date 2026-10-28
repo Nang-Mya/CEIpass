@@ -103,7 +103,7 @@ public class PassSummaryService {
         return userPass.getStatus();
     }
 
-    private String displayStatus(UserPassEntity userPass, LocalDate today) {
+    static String displayStatus(UserPassEntity userPass, LocalDate today) {
         if (userPass.getStartDate() == null || userPass.getEndDate() == null
                 || today.isBefore(userPass.getStartDate())) {
             return "NOT STARTED";

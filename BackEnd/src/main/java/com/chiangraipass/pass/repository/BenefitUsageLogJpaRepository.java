@@ -24,6 +24,37 @@ public interface BenefitUsageLogJpaRepository extends JpaRepository<BenefitUsage
     List<UsageHistoryItem> findRecentUsage(@Param("accountId") UUID accountId, Pageable pageable);
 
     @Query("""
+            select new com.chiangraipass.history.dto.UsageHistoryItem(
+                a.publicName, p.displayName, l.checkinDatetime, l.validationStatus)
+            from BenefitUsageLogEntity l
+            join l.userPass up
+            join up.pass p
+            join l.partner a
+            where up.userPassId = :userPassId
+              and up.account.accountId = :accountId
+            order by l.checkinDatetime desc
+            """)
+    List<UsageHistoryItem> findRecentUsageByUserPassIdAndAccountId(
+            @Param("userPassId") UUID userPassId,
+            @Param("accountId") UUID accountId,
+            Pageable pageable);
+
+    @Query("""
+            select new com.chiangraipass.history.dto.UsageHistoryItem(
+                a.publicName, p.displayName, l.checkinDatetime, l.validationStatus)
+            from BenefitUsageLogEntity l
+            join l.userPass up
+            join up.pass p
+            join l.partner a
+            where up.userPassId = :userPassId
+              and up.account.accountId = :accountId
+            order by l.checkinDatetime desc
+            """)
+    List<UsageHistoryItem> findAllUsageByUserPassIdAndAccountId(
+            @Param("userPassId") UUID userPassId,
+            @Param("accountId") UUID accountId);
+
+    @Query("""
             select l.benefit.benefitId, count(l)
             from BenefitUsageLogEntity l
             where l.userPass.userPassId = :userPassId

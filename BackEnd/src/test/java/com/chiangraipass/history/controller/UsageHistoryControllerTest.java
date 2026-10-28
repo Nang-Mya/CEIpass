@@ -166,6 +166,28 @@ class UsageHistoryControllerTest {
         assertEquals("VALID_SUCCESS", items.get(0).get("status").asText());
     }
 
+    @Test
+    void userPassIdReturnsOnlyThatPassHistory() throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/me/usage-history")
+                        .param("userPassId", visitorA.userPass().getUserPassId().toString())
+                        .with(visitorAuthentication(visitorA.accountId(), visitorA.email())))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        var items = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertEquals(3, items.size());
+        assertEquals("Attraction A", items.get(0).get("attractionName").asText());
+        assertEquals("VALID_SUCCESS", items.get(0).get("status").asText());
+    }
+
+    @Test
+    void userPassIdFromAnotherVisitorReturnsNotFound() throws Exception {
+        mockMvc.perform(get("/api/v1/me/usage-history")
+                        .param("userPassId", visitorB.userPass().getUserPassId().toString())
+                        .with(visitorAuthentication(visitorA.accountId(), visitorA.email())))
+                .andExpect(status().isNotFound());
+    }
+
     private VisitorFixture createVisitorFixture(String label, String passName, String attractionName) {
         UUID accountId = UUID.randomUUID();
         String email = label + "-" + accountId + "@example.test";

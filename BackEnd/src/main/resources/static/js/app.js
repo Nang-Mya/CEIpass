@@ -6,7 +6,7 @@ const QR_DATABASE_NAME = "cei-pass-private-cache";
 const QR_STORE_NAME = "issued-qr";
 const QR_ENDPOINT = "/api/v1/me/qr";
 const HISTORY_ENDPOINT = "/api/v1/me/usage-history";
-const PASS_SUMMARY_ENDPOINT = "/api/v1/me/pass-summary";
+const MY_PASSES_ENDPOINT = "/api/v1/me/passes";
 const PASSES_ENDPOINT = "/api/v1/catalog/passes";
 const ATTRACTIONS_ENDPOINT = "/api/v1/catalog/attractions";
 const CHECKOUT_ENDPOINT = "/api/v1/me/orders";
@@ -15,6 +15,9 @@ let passes = [];
 let attractions = [];
 let isCatalogLoaded = false;
 let catalogLoadError = false;
+let historyExpandedPassIds = new Set();
+let historyPassCards = [];
+let historyHasInitializedCards = false;
 
 const appContent = document.querySelector("#app-content");
 const cartCount = document.querySelector("#cart-count");
@@ -400,7 +403,7 @@ function historyListMarkup(history) {
     const quotaFailure = item.status === "QUOTA_EXCEEDED" || item.status === "QUOTA_USED";
     const label = success ? "Success" : quotaFailure ? "Quota Used" : escapeHtml(item.status);
     return `<article class="history-item">
-      <div class="history-item-copy"><h3>${escapeHtml(item.attractionName)}</h3><p>${escapeHtml(item.passName)}</p><time>${escapeHtml(formatDate(item.usedAt))}</time></div>
+      <div class="history-item-copy"><strong class="history-attraction-name">${escapeHtml(item.attractionName)}</strong><p>${escapeHtml(item.passName)}</p><time>${escapeHtml(formatDate(item.usedAt))}</time></div>
       <span class="me-badge ${success ? "is-available" : "is-used"}">${label}</span>
     </article>`;
   }).join("");
@@ -422,48 +425,63 @@ function historyPassRemaining(pass) {
   return notStarted ? `Starts in ${remaining}` : remaining;
 }
 
-function historyOverviewMarkup(account, summary) {
-  const pass = summary.pass;
-  const passCard = pass
-    ? `<article class="history-pass-card">
-        <div class="history-pass-head">
-          <h2>${escapeHtml(pass.passName)}</h2>
-        <span class="me-status history-pass-status ${pass.displayStatus === "ACTIVE" ? "is-active" : pass.displayStatus === "EXPIRED" ? "is-expired" : "is-not-started"}">${escapeHtml(pass.displayStatus)}</span>
-        </div>
-        <div class="history-pass-detail">
-          <p class="history-remaining-label">Remaining time</p>
-          <strong class="history-remaining">${escapeHtml(historyPassRemaining(pass))}</strong>
-          <p class="history-validity">Valid: ${escapeHtml(formatPassDate(pass.startDate))} - ${escapeHtml(formatPassDate(pass.endDate))}</p>
-        </div>
-      </article>`
-    : `<div class="empty-state"><h2>No active pass yet</h2></div>`;
-  const benefits = summary.benefits.length
-    ? `<ul class="me-benefits">${summary.benefits.map((benefit) => {
+function historyPassCardMarkup(pass) {
+  const passId = escapeHtml(pass.userPassId);
+  const expanded = historyExpandedPassIds.has(pass.userPassId);
+  const benefits = pass.benefits.length
+    ? `<ul class="me-benefits">${pass.benefits.map((benefit) => {
         const used = benefit.used >= benefit.limit;
+        const displayedUsed = Math.min(benefit.used, benefit.limit);
         return `<li class="me-benefit"><span><strong>${escapeHtml(benefit.attractionName)}</strong><small>${escapeHtml(benefit.detail)}</small></span>
-          <span class="me-badge ${used ? "is-used" : "is-available"}">${used ? "Used" : "Available"} (${escapeHtml(benefit.used)}/${escapeHtml(benefit.limit)})</span></li>`;
+          <span class="me-badge ${used ? "is-used" : "is-available"}">${used ? "Used" : "Available"} (${escapeHtml(displayedUsed)}/${escapeHtml(benefit.limit)})</span></li>`;
       }).join("")}</ul>`
-    : `<div class="empty-state"><h2>No active pass yet</h2></div>`;
+    : `<div class="empty-state"><h2>No benefits for this pass</h2></div>`;
 
+  return `<article class="history-pass-card">
+    <button type="button" class="history-pass-toggle" data-action="history-toggle" data-user-pass-id="${passId}" aria-expanded="${expanded}">
+      <span class="history-pass-head">
+        <h2>${escapeHtml(pass.passName)}</h2>
+        <span class="me-status history-pass-status ${pass.displayStatus === "ACTIVE" ? "is-active" : pass.displayStatus === "EXPIRED" ? "is-expired" : "is-not-started"}">${escapeHtml(pass.displayStatus)}</span>
+      </span>
+      <svg class="history-chevron${expanded ? " is-expanded" : ""}" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+    </button>
+    <div class="history-pass-detail">
+      <p class="history-remaining-label">Remaining time</p>
+      <strong class="history-remaining">${escapeHtml(historyPassRemaining(pass))}</strong>
+      <p class="history-validity">Valid: ${escapeHtml(formatPassDate(pass.startDate))} - ${escapeHtml(formatPassDate(pass.endDate))}</p>
+    </div>
+    <div class="history-pass-collapsible"${expanded ? "" : " hidden"}>
+      <section class="history-section"><h3 class="me-subtitle">Pass Benefits &amp; Quota</h3>${benefits}</section>
+      <section class="history-section">
+        <h3 class="me-subtitle">Check-in History</h3>
+        ${historyListMarkup(pass.recentUsage)}
+        <a class="me-link history-full-link" href="#history" data-action="history-full" data-user-pass-id="${passId}">View Full Usage History →</a>
+      </section>
+    </div>
+  </article>`;
+}
+
+function historyOverviewMarkup(account, passCards) {
+  const passContent = passCards.length
+    ? passCards.map(historyPassCardMarkup).join("")
+    : `<div class="me-card me-empty"><strong>No pass yet</strong><a class="button button-dark" href="#buy">Buy a pass</a></div>`;
   return `<section class="history-page">
     ${pageHeading("Your visits", "Pass history")}
     <article class="me-card me-identity history-profile"><strong>${escapeHtml(account.displayName)}</strong></article>
-    ${passCard}
-    <section class="me-card history-section"><h2 class="me-subtitle">Pass Benefits &amp; Quota</h2>${benefits}</section>
-    <section class="me-card history-section">
-      <h2 class="me-subtitle">Check-in History</h2>
-      ${historyListMarkup(summary.recentUsage)}
-      <a class="me-link history-full-link" href="#history" data-action="history-full">View Full Usage History →</a>
-    </section>
+    ${passContent}
   </section>`;
 }
 
-async function renderHistoryPage(showFullHistory = false) {
-  const heading = showFullHistory ? "Full Usage History" : "Pass history";
+async function renderHistoryPage(userPassId = null) {
+  const selectedPass = userPassId
+    ? historyPassCards.find((pass) => pass.userPassId === userPassId)
+    : null;
+  const heading = selectedPass ? `${escapeHtml(selectedPass.passName)} Usage History` : "Pass history";
   appContent.innerHTML = `<section>${pageHeading("Your visits", heading, "Loading...")}</section>`;
   try {
-    if (showFullHistory) {
-      const history = await requestJson(HISTORY_ENDPOINT, { cache: "no-store" });
+    if (selectedPass) {
+      const path = `${HISTORY_ENDPOINT}?userPassId=${encodeURIComponent(userPassId)}`;
+      const history = await requestJson(path, { cache: "no-store" });
       appContent.innerHTML = `<section class="history-page">
         ${pageHeading("Your visits", heading)}
         <button type="button" class="button button-outline history-back" data-action="history-recent">Back</button>
@@ -472,11 +490,19 @@ async function renderHistoryPage(showFullHistory = false) {
       return;
     }
 
-    const [account, summary] = await Promise.all([
+    const [account, passCards] = await Promise.all([
       requestJson("/api/v1/auth/me", { cache: "no-store" }),
-      requestJson(PASS_SUMMARY_ENDPOINT, { cache: "no-store" })
+      requestJson(MY_PASSES_ENDPOINT, { cache: "no-store" })
     ]);
-    appContent.innerHTML = historyOverviewMarkup(account, summary);
+    historyPassCards = passCards;
+    const availableIds = new Set(passCards.map((pass) => pass.userPassId));
+    historyExpandedPassIds = new Set(
+      [...historyExpandedPassIds].filter((passId) => availableIds.has(passId)));
+    if (!historyHasInitializedCards) {
+      if (passCards.length > 0) historyExpandedPassIds.add(passCards[0].userPassId);
+      historyHasInitializedCards = true;
+    }
+    appContent.innerHTML = historyOverviewMarkup(account, passCards);
   } catch (error) {
     if (error.status === 401) appContent.innerHTML = `<section>${pageHeading("Your visits", "Pass history")}<div class="empty-state"><h2>Sign in required</h2></div></section>`;
     else appContent.innerHTML = `<section>${pageHeading("Your visits", "Pass history")}<div class="empty-state"><h2>History unavailable</h2></div></section>`;
@@ -932,6 +958,17 @@ document.addEventListener("click", async (event) => {
   const control = event.target.closest("[data-action]"); if (!control) return;
 
   switch (control.dataset.action) {
+    case "history-toggle": {
+      const userPassId = control.dataset.userPassId;
+      const body = control.parentElement.querySelector(".history-pass-collapsible");
+      const chevron = control.querySelector(".history-chevron");
+      body.hidden = !body.hidden;
+      control.setAttribute("aria-expanded", String(!body.hidden));
+      chevron.classList.toggle("is-expanded", !body.hidden);
+      if (body.hidden) historyExpandedPassIds.delete(userPassId);
+      else historyExpandedPassIds.add(userPassId);
+      break;
+    }
     case "add-to-cart":
       const id = control.dataset.id;
       const startInp = document.getElementById("trip-start");
@@ -964,7 +1001,11 @@ document.addEventListener("click", async (event) => {
       } catch (e) { showNotice("Checkout Failed", e.message || "Please sign in to complete checkout."); control.disabled = false; control.innerHTML = `Confirm & Checkout <span aria-hidden="true">→</span>`; }
       break;
     case "profile-mode": setProfileMode(control.dataset.mode); break;
-    case "history-full": event.preventDefault(); await renderHistoryPage(true); break;
+    case "history-full":
+      event.preventDefault();
+      historyExpandedPassIds.add(control.dataset.userPassId);
+      await renderHistoryPage(control.dataset.userPassId);
+      break;
     case "history-recent": await renderHistoryPage(); break;
     case "logout":
       try { const csrf = await csrfHeaders(); await fetch(apiUrl("/api/v1/auth/logout"), { method: "POST", headers: csrf, credentials: "include" }); setHeaderAvatar(""); if (avatarObjectUrl) { URL.revokeObjectURL(avatarObjectUrl); avatarObjectUrl = ""; } try { await clearAllCachedQr(); localStorage.removeItem(LAST_QR_ACCOUNT_KEY); } catch (e) {} profileMode = "login"; profileFeedback = "Signed out."; render(); } catch (e) {} break;
