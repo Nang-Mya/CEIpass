@@ -88,12 +88,14 @@ class LoginAttemptServiceTest {
 
     @Test
     void unknownBlankAndNullInputsAreIgnoredWithoutError() {
+        long existingAccounts = accounts.count();
+
         service.recordFailure("nobody@example.com");
         service.recordFailure("   ");
         service.recordFailure(null);
         service.recordSuccess(UUID.randomUUID());
 
-        assertThat(accounts.count()).isZero();
+        assertThat(accounts.count()).isEqualTo(existingAccounts);
     }
 
 }
