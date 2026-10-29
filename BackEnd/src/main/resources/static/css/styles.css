@@ -891,6 +891,37 @@ attraction-art {
   overflow-wrap: anywhere;
 }
 
+.history-filters {
+  display: flex;
+  overflow-x: auto;
+  padding: 0.15rem 0 0.35rem;
+  gap: 0.5rem;
+  scrollbar-width: thin;
+}
+
+.history-filter {
+  flex: 0 0 auto;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #d6dfd4;
+  border-radius: 999px;
+  background: #fff;
+  color: #526653;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.history-filter.is-selected {
+  border-color: #244b34;
+  background: #244b34;
+  color: #fff;
+}
+
+.history-pass-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
 .history-pass-card {
   display: grid;
   margin-bottom: 0;
@@ -1293,6 +1324,240 @@ attraction-art {
   flex: 0 0 auto;
   color: #899287;
   font-size: 0.58rem;
+}
+
+.qr-pass-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.qr-carousel {
+  display: grid;
+  width: 100%;
+  max-width: 38rem;
+  margin-inline: auto;
+  gap: 0.35rem;
+}
+
+.qr-carousel-toolbar {
+  display: grid;
+  min-height: 2rem;
+  place-items: center;
+}
+
+.qr-position {
+  color: #596a58;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.qr-arrow {
+  display: grid;
+  position: absolute;
+  z-index: 1;
+  top: 38%;
+  width: 2.5rem;
+  height: 3.5rem;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #000000;
+  cursor: pointer;
+  font-size: 2.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.qr-arrow-previous {
+  left: 0.45rem;
+}
+
+.qr-arrow-next {
+  right: 0.45rem;
+}
+
+.qr-arrow:disabled {
+  color: #8d9690;
+  cursor: default;
+}
+
+.qr-carousel-viewport {
+  position: relative;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.qr-pass-card {
+  display: grid;
+  min-height: 28rem;
+  padding: 1rem 3.25rem 1.5rem;
+  gap: 0.75rem;
+  border: 1px solid #e4e8df;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.qr-pass-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.qr-pass-heading h2 {
+  min-width: 0;
+  margin: 0.25rem 0 0;
+  font-family: Georgia, serif;
+  font-size: 1.2rem;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.qr-pass-card .qr-card {
+  width: 100%;
+  padding: 0.25rem 0 0;
+  border: 0;
+}
+
+.qr-pass-message,
+.qr-cache-message {
+  margin: 0;
+  color: #657461;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.qr-availability {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  min-height: 21rem;
+  gap: 0.75rem;
+  color: #657461;
+  text-align: center;
+}
+
+.qr-availability-card {
+  display: flex;
+  min-width: 0;
+  min-height: 10rem;
+  padding: 1rem 0.75rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border: 1px solid #e4e8df;
+  border-radius: 0.85rem;
+  background: #fff;
+}
+
+.qr-availability-card p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.qr-availability-card strong {
+  color: #294a34;
+}
+
+.qr-availability-date {
+  flex-direction: row;
+  gap: 0.6rem;
+}
+
+.qr-availability-date svg {
+  width: 1.55rem;
+  height: 1.55rem;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.qr-availability-date > div {
+  min-width: 0;
+}
+
+.qr-availability-date strong {
+  white-space: nowrap;
+  font-size: 1.2rem;
+}
+
+.qr-availability-countdown {
+  gap: 0.45rem;
+}
+
+.qr-availability-countdown .qr-starts-in {
+  font-size: 1.45rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.qr-cache-message {
+  text-align: center;
+}
+
+.qr-pass-card > .button {
+  justify-self: start;
+}
+
+@media (max-width: 520px) {
+  .qr-pass-card {
+    min-height: 24rem;
+    padding: 0.9rem 2.65rem 1.25rem;
+  }
+
+  .qr-availability {
+    min-height: 17rem;
+    gap: 0.45rem;
+  }
+
+  .qr-availability-card {
+    min-height: 8.5rem;
+    padding: 0.65rem 0.35rem;
+    gap: 0.4rem;
+  }
+
+  .qr-availability-card p {
+    font-size: 0.75rem;
+  }
+
+  .qr-availability-date {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .qr-availability-date svg {
+    width: 1.35rem;
+    height: 1.35rem;
+  }
+
+  .qr-availability-date strong {
+    font-size: 0.75rem;
+  }
+
+  .qr-availability-countdown .qr-starts-in {
+    font-size: 0.85rem;
+  }
+
+  .qr-arrow {
+    width: 2rem;
+    height: 3rem;
+    font-size: 2.25rem;
+  }
+
+  .qr-arrow-previous {
+    left: 0.2rem;
+  }
+
+  .qr-arrow-next {
+    right: 0.2rem;
+  }
 }
 
 .qr-card {
