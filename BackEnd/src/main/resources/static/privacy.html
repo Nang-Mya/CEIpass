@@ -6,6 +6,10 @@
     <meta name="theme-color" content="#f6f7f2">
     <title>Privacy Notice - Chiang Rai Pass</title>
     <link rel="stylesheet" href="./css/styles.css">
+    <script>
+      // Shown inside the app's Privacy Notice window: hide the page's own header and back link.
+      if (new URLSearchParams(location.search).has("embed")) document.documentElement.classList.add("embedded");
+    </script>
   </head>
   <body>
     <div class="app-frame notice-page">
@@ -81,8 +85,16 @@
           </ul>
         </section>
 
-        <p><a class="me-link" href="./index.html#profile">← Back to Chiang Rai Pass</a></p>
+        <p class="notice-back"><a class="me-link" id="notice-back-link" href="./index.html#profile">← Back to Chiang Rai Pass</a></p>
       </main>
     </div>
+      <script>
+      document.getElementById("notice-back-link").addEventListener("click", function (event) {
+        if (document.referrer.indexOf(location.origin) === 0 && history.length > 1) {
+          event.preventDefault();
+          history.back();
+        }
+      });
+    </script>
   </body>
 </html>
