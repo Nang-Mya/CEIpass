@@ -79,6 +79,7 @@ public class SecurityConfiguration {
             ObjectProvider<VisitorAccountService> accounts) throws Exception {
         http
                 .cors(Customizer.withDefaults())
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .securityContext(context -> context.requireExplicitSave(false)) // Auto-syncs context to session[cite: 3]
                 .csrf(csrf -> csrf
                 .csrfTokenRepository(csrfTokenRepository)
