@@ -76,6 +76,7 @@ public class PassesService {
         return new PassCardResponse(
                 userPass.getUserPassId(),
                 userPass.getPass().getDisplayName(),
+                userPass.getHolderName(),
                 userPass.getPurchaseDatetime(),
                 userPass.getStartDate(),
                 userPass.getEndDate(),

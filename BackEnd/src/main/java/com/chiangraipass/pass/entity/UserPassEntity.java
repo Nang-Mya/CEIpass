@@ -53,6 +53,9 @@ public class UserPassEntity {
     @Column(name = "end_date")
     private LocalDate endDate;
 
+    @Column(name = "holder_name", length = 120)
+    private String holderName;
+
     @Column(name = "status", nullable = false, length = 16)
     private String status;
 
@@ -139,6 +142,14 @@ public class UserPassEntity {
 
     public void setEndDate(LocalDate endDate) {
         this.endDate = endDate;
+    }
+
+    public String getHolderName() {
+        return holderName;
+    }
+
+    public void setHolderName(String holderName) {
+        this.holderName = holderName;
     }
 
     public String getStatus() {

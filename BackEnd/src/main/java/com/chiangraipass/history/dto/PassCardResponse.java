@@ -8,6 +8,7 @@ import java.util.UUID;
 public record PassCardResponse(
         UUID userPassId,
         String passName,
+        String holderName,
         Instant purchaseDatetime,
         LocalDate startDate,
         LocalDate endDate,

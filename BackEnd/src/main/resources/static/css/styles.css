@@ -187,6 +187,10 @@ input:focus-visible {
   line-height: 0.98;
 }
 
+.hero-copy > .button {
+  margin-top: 1.20rem;
+}
+
 .hero-copy > p:not(.eyebrow) {
   max-width: 18rem;
   margin: 0.85rem 0 1.2rem;
@@ -773,6 +777,56 @@ attraction-art {
 .cart-line-main strong,
 .cart-line-main span {
   display: block;
+}
+
+.cart-holder,
+.cart-dates {
+  margin-top: 0.2rem;
+  color: #5c5c5c;
+  font-size: 0.75rem;
+}
+
+.cart-remove {
+  flex: 0 0 auto;
+  padding: 0.4rem;
+  border: 0;
+  background: transparent;
+  color: #8a5548;
+  cursor: pointer;
+  font-size: 0.72rem;
+  text-decoration: underline;
+}
+
+.pass-details-dialog {
+  max-height: min(90vh, 42rem);
+  overflow: auto;
+}
+
+.pass-detail-field {
+  display: grid;
+  margin: 0.85rem 0;
+  gap: 0.35rem;
+  color: #526653;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.pass-detail-field input {
+  width: 100%;
+  min-height: 2.8rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #d6dfd4;
+  border-radius: 0.65rem;
+  background: #fff;
+  color: #20231f;
+  font: inherit;
+  font-weight: 400;
+}
+
+.pass-detail-date-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
 }
 
 .cart-line-main strong {
@@ -1568,6 +1622,11 @@ attraction-art {
 }
 
 @media (max-width: 520px) {
+  .pass-detail-date-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
   .qr-pass-card {
     min-height: 24rem;
     padding: 0.9rem 2.65rem 1.25rem;

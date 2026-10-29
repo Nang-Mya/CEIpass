@@ -128,6 +128,10 @@ function escapeHtml(value) {
   })[character]);
 }
 
+function formatNamedPassTitle(passName, holderName) {
+  return escapeHtml(holderName ? `${holderName}'s ${passName}` : passName);
+}
+
 function formatPrice(amount) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(amount);
 }
@@ -270,13 +274,11 @@ function cartDetails() {
     
     return `<div class="cart-line">
       <div class="cart-line-main"><strong>${escapeHtml(pass.name)}</strong>
-      <span style="font-size: 0.85rem; color: #5c5c5c;">${item.startDate} to ${item.endDate} (${days} days)</span>
+      <span class="cart-holder">For ${escapeHtml(item.holderName || "Name required")}</span>
+      <span class="cart-dates">${item.startDate} to ${item.endDate} (${days} days)</span>
       <span>${formatPrice(pass.price)} / day</span></div>
-      <div class="quantity-control">
-        <button type="button" data-action="update-cart" data-index="${index}" data-amount="-1">−</button>
-        <span>${item.quantity}</span>
-        <button type="button" data-action="update-cart" data-index="${index}" data-amount="1">+</button>
-      </div></div>`;
+      <button type="button" class="cart-remove" data-action="remove-cart" data-index="${index}" aria-label="Remove ${escapeHtml(pass.name)} for ${escapeHtml(item.holderName || "pass holder")}">Remove</button>
+    </div>`;
   }).join("");
 
   return `<div class="cart-lines">${lines}<div class="cart-total"><span>Total</span><strong>${formatPrice(total)}</strong></div>
@@ -285,27 +287,16 @@ function cartDetails() {
 
 function buyPage() {
   if (catalogLoadError || (isCatalogLoaded && passes.length === 0)) return `<section>${pageHeading("Find your pass", "Choose your way to explore.")}${emptyCatalogState()}</section>`;
-  
-  const todayDate = new Date();
-  const todayStr = new Date(todayDate.getTime() - (todayDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 
   return `<section>
-    ${pageHeading("Find your pass", "Choose your way to explore.", "Pick a pass and dates for your trip.")}
-    
-    <div class="notice-card" style="margin-bottom:1.5rem; background:#fff; border:1px solid #e1e3db;">
-       <p style="font-weight:600; margin-bottom:0.5rem;">1. Select your travel dates</p>
-       <div style="display:flex; gap:1rem; align-items:center;">
-          <label style="flex:1; font-size:0.875rem;">Start: <input type="date" id="trip-start" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;" min="${todayStr}"></label>
-          <label style="flex:1; font-size:0.875rem;">End: <input type="date" id="trip-end" style="width:100%; padding:0.5rem; border:1px solid #ccc; border-radius:4px;"></label>
-       </div>
-    </div>
+    ${pageHeading("Find your pass", "Choose your way to explore.", "Select a pass and enter the holder's details and travel dates.")}
 
     <div class="pass-list">
       ${passes.map((pass, index) => `<article class="pass-card">
         <div class="pass-art pass-art-${index % 3 + 1}" aria-hidden="true"><span>${pass.name.substring(0,3).toUpperCase()}</span></div>
         <div class="pass-details"><span class="pass-tag">${escapeHtml(pass.tag)}</span><h2>${escapeHtml(pass.name)}</h2><p>${escapeHtml(pass.detail)}</p>
           <div class="pass-buy-row"><strong class="pass-price">${formatPrice(pass.price)}<small> / day</small></strong>
-            <button type="button" class="button button-outline" data-action="add-to-cart" data-id="${pass.id}">Add to cart</button>
+            <button type="button" class="button button-outline" data-action="add-to-cart" data-id="${escapeHtml(pass.id)}">Select pass</button>
           </div>
         </div>
       </article>`).join("")}
@@ -381,7 +372,7 @@ function qrPassCardMarkup(pass, record = null, isCached = false, errorMessage = 
       : `<div class="qr-pass-message">Start date unavailable.</div>`;
   }
   return `<article class="qr-pass-card" data-qr-pass-id="${escapeHtml(pass.userPassId)}">
-    <div class="qr-pass-heading"><h2>${escapeHtml(pass.passName)}</h2><span class="me-status history-pass-status ${statusClass}">${escapeHtml(pass.displayStatus === "NOT STARTED" ? "NOT ACTIVE YET" : pass.displayStatus)}</span></div>
+    <div class="qr-pass-heading"><h2>${formatNamedPassTitle(pass.passName, pass.holderName)}</h2><span class="me-status history-pass-status ${statusClass}">${escapeHtml(pass.displayStatus === "NOT STARTED" ? "NOT ACTIVE YET" : pass.displayStatus)}</span></div>
     ${content}
   </article>`;
 }
@@ -589,7 +580,7 @@ function historyPassCardMarkup(pass) {
   return `<article class="history-pass-card" data-history-category="${passCategory}">
     <button type="button" class="history-pass-toggle" data-action="history-toggle" data-user-pass-id="${passId}" aria-expanded="${expanded}">
       <span class="history-pass-head">
-        <h2>${escapeHtml(pass.passName)}</h2>
+        <span><h2>${formatNamedPassTitle(pass.passName, pass.holderName)}</h2></span>
         <span class="me-status history-pass-status ${statusClass}">${escapeHtml(statusLabel)}</span>
       </span>
       <svg class="history-chevron${expanded ? " is-expanded" : ""}" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
@@ -1176,6 +1167,86 @@ function showNotice(title, message) {
   document.body.append(d); d.showModal();
 }
 
+function dateInputValue(date = new Date()) {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 10);
+}
+
+function openPassDetailsDialog(passId) {
+  const pass = passes.find((item) => item.id === passId);
+  if (!pass) {
+    showNotice("Pass unavailable", "Please refresh the catalog and try again.");
+    return;
+  }
+
+  document.querySelector("#pass-details-dialog")?.remove();
+  const today = dateInputValue();
+  const dialog = document.createElement("dialog");
+  dialog.id = "pass-details-dialog";
+  dialog.className = "notice-dialog pass-details-dialog";
+  dialog.innerHTML = `<form id="pass-details-form" class="dialog-content" data-pass-id="${escapeHtml(pass.id)}">
+    <button class="dialog-close" type="button" data-action="close-pass-dialog" aria-label="Close">×</button>
+    <p class="eyebrow">Pass details</p>
+    <h2>${escapeHtml(pass.name)}</h2>
+    <p>Enter the pass holder's name and travel dates. This pass will be added to your cart for checkout.</p>
+    <label class="pass-detail-field">Pass holder name
+      <input name="holderName" type="text" maxlength="120" autocomplete="name" required>
+    </label>
+    <div class="pass-detail-date-row">
+      <label class="pass-detail-field">Start date
+        <input name="startDate" type="date" min="${today}" value="${today}" required>
+      </label>
+      <label class="pass-detail-field">End date
+        <input name="endDate" type="date" min="${today}" value="${today}" required>
+      </label>
+    </div>
+    <p class="form-message" role="alert"></p>
+    <button type="submit" class="button button-dark button-full">Confirm and add to cart</button>
+  </form>`;
+  document.body.append(dialog);
+  const startDate = dialog.querySelector('[name="startDate"]');
+  const endDate = dialog.querySelector('[name="endDate"]');
+  startDate.addEventListener("change", () => {
+    endDate.min = startDate.value || today;
+    if (endDate.value && endDate.value < endDate.min) endDate.value = endDate.min;
+  });
+  dialog.showModal();
+  dialog.querySelector('[name="holderName"]').focus();
+}
+
+document.addEventListener("submit", (event) => {
+  const form = event.target;
+  if (form.id !== "pass-details-form") return;
+  event.preventDefault();
+  if (!form.reportValidity()) return;
+
+  const holderName = form.elements.holderName.value.trim();
+  const startDate = form.elements.startDate.value;
+  const endDate = form.elements.endDate.value;
+  const message = form.querySelector(".form-message");
+  if (!holderName) {
+    message.textContent = "Enter the pass holder's name.";
+    return;
+  }
+  if (endDate < startDate) {
+    message.textContent = "End date cannot be before start date.";
+    return;
+  }
+  const pass = passes.find((item) => item.id === form.dataset.passId);
+  if (!pass) {
+    message.textContent = "This pass is no longer available. Please refresh the catalog.";
+    return;
+  }
+
+  cart.push({ passId: pass.id, holderName, startDate, endDate, quantity: 1 });
+  persistCart();
+  const dialog = form.closest("dialog");
+  dialog.close();
+  dialog.remove();
+  render();
+  announce(`${pass.name} added to cart.`);
+});
+
 document.addEventListener("click", async (event) => {
   if (event.target.closest("[data-navigate]")) { window.location.hash = event.target.closest("[data-navigate]").dataset.navigate; return; }
   const control = event.target.closest("[data-action]"); if (!control) return;
@@ -1205,35 +1276,40 @@ document.addEventListener("click", async (event) => {
       if (historyAccount) appContent.innerHTML = historyOverviewMarkup(historyAccount, historyPassCards);
       break;
     case "add-to-cart":
-      const id = control.dataset.id;
-      const startInp = document.getElementById("trip-start");
-      const endInp = document.getElementById("trip-end");
-      if (!startInp.value || !endInp.value) { showNotice("Dates Required", "Please select your Start and End dates at the top before adding a pass."); return; }
-      if (endInp.value < startInp.value) { showNotice("Invalid Dates", "The End Date cannot be before the Start Date."); return; }
-      const exist = cart.find(i => i.passId === id && i.startDate === startInp.value && i.endDate === endInp.value);
-      if (exist) { exist.quantity += 1; if (exist.quantity > 10) exist.quantity = 10; } 
-      else cart.push({ passId: id, startDate: startInp.value, endDate: endInp.value, quantity: 1 });
-      persistCart(); render(); announce("Cart updated.");
+      openPassDetailsDialog(control.dataset.id);
       break;
-    case "update-cart":
+    case "remove-cart":
       const idx = parseInt(control.dataset.index);
-      cart[idx].quantity += parseInt(control.dataset.amount);
-      if (cart[idx].quantity <= 0) cart.splice(idx, 1);
-      else if (cart[idx].quantity > 10) cart[idx].quantity = 10;
+      if (Number.isInteger(idx) && idx >= 0 && idx < cart.length) cart.splice(idx, 1);
       persistCart(); render();
       break;
     case "checkout":
       if (cart.length === 0) return;
+      if (cart.some((item) => !item.holderName?.trim())) {
+        showNotice("Pass details needed", "Remove the older cart item and select the pass again to enter its holder name and travel dates.");
+        return;
+      }
       control.disabled = true; control.textContent = "Processing...";
+      let completedCount = 0;
       try {
         const csrf = await csrfHeaders();
-        for (const item of cart) {
+        for (const item of [...cart]) {
           await requestJson(CHECKOUT_ENDPOINT, { method: "POST", headers: { ...csrf, "Content-Type": "application/json" }, body: JSON.stringify(item), cache: "no-store" });
+          const itemIndex = cart.indexOf(item);
+          if (itemIndex >= 0) cart.splice(itemIndex, 1);
+          completedCount += 1;
+          persistCart();
         }
-        cart = []; persistCart();
-        showNotice("Success!", "Your payment was processed and passes have been added to your account. Go to 'My QR' to view them.");
+        showNotice("Checkout complete", "Your passes are now in History. Active passes have QR codes in My QR; future passes will show their start date.");
         render();
-      } catch (e) { showNotice("Checkout Failed", e.message || "Please sign in to complete checkout."); control.disabled = false; control.innerHTML = `Confirm & Checkout <span aria-hidden="true">→</span>`; }
+      } catch (e) {
+        render();
+        const title = completedCount ? "Checkout incomplete" : "Checkout failed";
+        const message = completedCount
+          ? `${completedCount} pass${completedCount === 1 ? " was" : "es were"} checked out. Completed items were removed from your cart; review the remaining items before trying again. ${e.message}`
+          : e.message || "Please sign in to complete checkout.";
+        showNotice(title, message);
+      }
       break;
     case "profile-mode": setProfileMode(control.dataset.mode); break;
     case "history-full":
@@ -1285,6 +1361,12 @@ document.addEventListener("click", async (event) => {
       break;
     }
     case "close-dialog": control.closest("dialog")?.close(); break;
+    case "close-pass-dialog": {
+      const dialog = control.closest("dialog");
+      dialog?.close();
+      dialog?.remove();
+      break;
+    }
   }
 });
 
