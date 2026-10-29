@@ -39,7 +39,7 @@ Prerequisites: Java 21 and Maven 3.9+.
 
    The default H2 database is created in memory and reset when the application stops. Hibernate manages the schema; no database setup or SQL migration step is required. Check the API at `http://localhost:8080/api/v1/health`.
 
-2. Serve `FrontEnd/` at `http://localhost:5500` with a static-file development server, such as the VS Code Live Server extension. The visitor UI calls the API at `http://localhost:8080`; configure `FrontEnd/js/config.js` if your local API address differs. The five screens and sample catalog/cart work in the browser. Public catalog and authentication endpoints are implemented, but the catalog UI still uses sample data. New registrations remain disabled until a reviewed privacy notice is published and explicitly configured; provider sign-in additionally requires provider credentials. See [Authentication setup](docs/authentication.md). Payment, history, and venue redemption are not implemented.
+2. Serve `FrontEnd/` at `http://localhost:8080` with a static-file development server, such as the VS Code Live Server extension. The visitor UI calls the API at `http://localhost:8080`; configure `FrontEnd/js/config.js` if your local API address differs. The five screens and sample catalog/cart work in the browser. Public catalog and authentication endpoints are implemented, but the catalog UI still uses sample data. New registrations remain disabled until a reviewed privacy notice is published and explicitly configured; provider sign-in additionally requires provider credentials. See [Authentication setup](docs/authentication.md). Payment, history, and venue redemption are not implemented.
 
 3. Run backend tests with `mvn -f BackEnd/pom.xml test`.
 
