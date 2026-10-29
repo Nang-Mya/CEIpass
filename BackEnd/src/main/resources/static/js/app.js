@@ -18,6 +18,13 @@ let catalogLoadError = false;
 let historyExpandedPassIds = new Set();
 let historyPassCards = [];
 let historyHasInitializedCards = false;
+let historyAccount = null;
+let historyPassFilter = "ALL";
+let qrPassCards = [];
+let qrAccountId = "";
+let qrRecordsByPassId = new Map();
+let qrSelectedIndex = 0;
+let qrSwipeStartX = null;
 
 const appContent = document.querySelector("#app-content");
 const cartCount = document.querySelector("#cart-count");
@@ -200,7 +207,7 @@ function updateCartCount() {
 function announce(message) { announcer.textContent = message; }
 function currentPage() {
   const page = window.location.hash.slice(1).split("?")[0];
-  return ["home", "buy", "qr", "history", "profile", "change-password", "reset"].includes(page) ? page : "home";
+  return ["home", "buy", "qr", "history", "profile", "change-password", "privacy-preferences", "reset"].includes(page) ? page : "home";
 }
 
 function pageHeading(eyebrow, title, description = "") {
@@ -325,8 +332,8 @@ function openQrDatabase() {
     request.onerror = () => reject(request.error);
   });
 }
-async function saveCachedQr(record) { const db = await openQrDatabase(); return new Promise((res, rej) => { const tx = db.transaction(QR_STORE_NAME, "readwrite"); tx.objectStore(QR_STORE_NAME).put(record); tx.oncomplete = () => { db.close(); res(); }; tx.onerror = () => { db.close(); rej(tx.error); }; }); }
-async function getCachedQr(accountId) { const db = await openQrDatabase(); return new Promise((res, rej) => { const tx = db.transaction(QR_STORE_NAME, "readonly"); const req = tx.objectStore(QR_STORE_NAME).get(accountId); req.onsuccess = () => { db.close(); res(req.result || null); }; req.onerror = () => { db.close(); rej(req.error); }; }); }
+async function saveCachedQrs(accountId, records) { const db = await openQrDatabase(); return new Promise((res, rej) => { const tx = db.transaction(QR_STORE_NAME, "readwrite"); tx.objectStore(QR_STORE_NAME).put({ accountId, records }); tx.oncomplete = () => { db.close(); res(); }; tx.onerror = () => { db.close(); rej(tx.error); }; }); }
+async function getCachedQrs(accountId) { const db = await openQrDatabase(); return new Promise((res, rej) => { const tx = db.transaction(QR_STORE_NAME, "readonly"); const req = tx.objectStore(QR_STORE_NAME).get(accountId); req.onsuccess = () => { db.close(); const saved = req.result; res(Array.isArray(saved?.records) ? saved.records : saved?.userPassId ? [saved] : []); }; req.onerror = () => { db.close(); rej(req.error); }; }); }
 async function clearCachedQr(accountId) { if (!accountId) return; const db = await openQrDatabase(); return new Promise((res) => { const tx = db.transaction(QR_STORE_NAME, "readwrite"); tx.objectStore(QR_STORE_NAME).delete(accountId); tx.oncomplete = () => { db.close(); res(); }; }); }
 async function clearAllCachedQr() { const db = await openQrDatabase(); return new Promise((res) => { const tx = db.transaction(QR_STORE_NAME, "readwrite"); tx.objectStore(QR_STORE_NAME).clear(); tx.oncomplete = () => { db.close(); res(); }; }); }
 
@@ -337,14 +344,86 @@ async function clearQrForAccountSwitch(accountId) {
   return "";
 }
 
-function renderQrCard(record, isCached) {
-  const expiry = new Date(record.expiresAt);
-  if (!Number.isFinite(expiry.getTime()) || (expiry.getTime() - Date.now()) <= 0) return `<div class="empty-state"><h2>QR Expired</h2><button type="button" class="button button-outline" data-action="refresh-qr">Try again</button></div>`;
+function renderQrCard(record, isCached, userPassId) {
   const offlineBanner = isCached ? `<div class="offline-banner"><strong>Saved code</strong></div>` : "";
   return `<div class="qr-card">${offlineBanner}<div class="qr-card-heading"><span>Ready to scan</span></div>
-    <img class="qr-image" src="${record.qrImageDataUrl}" alt="QR"><h2>${escapeHtml(record.passName || "Pass")}</h2>
+    <img class="qr-image" src="${record.qrImageDataUrl}" alt="QR code for ${escapeHtml(record.passName || "pass")}">
     <p class="qr-expiry" data-expiry="${escapeHtml(record.expiresAt)}">Expires in <strong>--:--</strong></p>
-    <button type="button" class="button button-outline button-full" data-action="refresh-qr"${isCached ? " disabled" : ""}>Refresh</button></div>`;
+    <button type="button" class="button button-outline button-full" data-action="refresh-qr" data-user-pass-id="${escapeHtml(userPassId)}"${isCached ? " disabled" : ""}>Refresh</button></div>`;
+}
+
+function qrPassCardMarkup(pass, record = null, isCached = false, errorMessage = "") {
+  const isActive = pass.displayStatus === "ACTIVE";
+  const statusClass = pass.displayStatus === "ACTIVE"
+    ? "is-active"
+    : pass.displayStatus === "EXPIRED" ? "is-expired" : "is-not-started";
+  let content = "";
+  if (record && new Date(record.expiresAt).getTime() > Date.now()) {
+    content = renderQrCard(record, isCached, pass.userPassId);
+  } else if (isActive) {
+    content = `<div class="qr-pass-message">${escapeHtml(errorMessage || "QR code unavailable. Try refreshing.")}</div>
+      <button type="button" class="button button-outline" data-action="refresh-qr" data-user-pass-id="${escapeHtml(pass.userPassId)}">Try again</button>`;
+  } else if (pass.displayStatus === "EXPIRED") {
+    content = `<div class="qr-pass-message">This pass has expired.</div>`;
+  } else {
+    const startsAt = pass.startsAt && Number.isFinite(new Date(pass.startsAt).getTime());
+    content = startsAt
+      ? `<div class="qr-availability">
+          <div class="qr-availability-card qr-availability-date">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M16 3v4M8 3v4M3 10h18"></path></svg>
+            <div><p>Available on</p><strong>${escapeHtml(formatPassDate(pass.startDate))}</strong></div>
+          </div>
+          <div class="qr-availability-card qr-availability-countdown">
+            <p>Starts in</p>
+            <strong class="qr-starts-in" data-starts-at="${escapeHtml(pass.startsAt)}">--</strong>
+          </div>
+        </div>`
+      : `<div class="qr-pass-message">Start date unavailable.</div>`;
+  }
+  return `<article class="qr-pass-card" data-qr-pass-id="${escapeHtml(pass.userPassId)}">
+    <div class="qr-pass-heading"><h2>${escapeHtml(pass.passName)}</h2><span class="me-status history-pass-status ${statusClass}">${escapeHtml(pass.displayStatus === "NOT STARTED" ? "NOT ACTIVE YET" : pass.displayStatus)}</span></div>
+    ${content}
+  </article>`;
+}
+
+function sortQrPasses(passes) {
+  const statusOrder = { ACTIVE: 0, "NOT STARTED": 1, EXPIRED: 2 };
+  return [...passes].sort((a, b) =>
+    (statusOrder[a.displayStatus] ?? 3) - (statusOrder[b.displayStatus] ?? 3));
+}
+
+function renderQrCarousel() {
+  const carousel = document.querySelector(".qr-carousel");
+  if (!carousel || !qrPassCards.length) return;
+
+  qrSelectedIndex = Math.max(0, Math.min(qrSelectedIndex, qrPassCards.length - 1));
+  const pass = qrPassCards[qrSelectedIndex];
+  const result = qrRecordsByPassId.get(pass.userPassId);
+  carousel.innerHTML = `
+    <div class="qr-carousel-toolbar">
+      <span class="qr-position" aria-live="polite">${qrSelectedIndex + 1} of ${qrPassCards.length} passes</span>
+    </div>
+    <div class="qr-carousel-viewport" aria-live="polite">
+      ${qrPassCardMarkup(pass, result?.record, result?.isCached || false, result?.error || "")}
+      <button type="button" class="qr-arrow qr-arrow-previous" data-action="qr-previous" aria-label="Previous pass"${qrSelectedIndex === 0 ? " disabled" : ""}>‹</button>
+      <button type="button" class="qr-arrow qr-arrow-next" data-action="qr-next" aria-label="Next pass"${qrSelectedIndex === qrPassCards.length - 1 ? " disabled" : ""}>›</button>
+    </div>`;
+  const viewport = carousel.querySelector(".qr-carousel-viewport");
+  viewport.addEventListener("pointerdown", (event) => {
+    qrSwipeStartX = event.clientX;
+  });
+  viewport.addEventListener("pointerup", (event) => {
+    if (qrSwipeStartX === null) return;
+    const distance = event.clientX - qrSwipeStartX;
+    qrSwipeStartX = null;
+    if (Math.abs(distance) < 50) return;
+    qrSelectedIndex += distance < 0 ? 1 : -1;
+    renderQrCarousel();
+  });
+  viewport.addEventListener("pointercancel", () => {
+    qrSwipeStartX = null;
+  });
+  startExpiryCountdown();
 }
 
 async function renderQrPage() {
@@ -352,12 +431,40 @@ async function renderQrPage() {
   appContent.innerHTML = `<section>${pageHeading("Your visits", "My QR pass", "Loading...")}</section>`;
   let lastAccount = localStorage.getItem(LAST_QR_ACCOUNT_KEY) || "";
   try {
-    const record = await requestJson(QR_ENDPOINT);
-    if (lastAccount && lastAccount !== record.accountId) await clearCachedQr(lastAccount);
-    try { await saveCachedQr(record); localStorage.setItem(LAST_QR_ACCOUNT_KEY, record.accountId); } catch (e) {}
+    const [account, passes] = await Promise.all([
+      requestJson("/api/v1/auth/me", { cache: "no-store" }),
+      requestJson("/api/v1/me/passes", { cache: "no-store" })
+    ]);
+    qrAccountId = account.accountId;
+    qrPassCards = sortQrPasses(passes);
+    qrSelectedIndex = 0;
+    if (lastAccount && lastAccount !== qrAccountId) await clearCachedQr(lastAccount);
+    localStorage.setItem(LAST_QR_ACCOUNT_KEY, qrAccountId);
+
+    const activePasses = qrPassCards.filter((pass) => pass.displayStatus === "ACTIVE");
+    const qrResults = await Promise.all(activePasses.map(async (pass) => {
+      try {
+        const path = `${QR_ENDPOINT}?userPassId=${encodeURIComponent(pass.userPassId)}`;
+        return { userPassId: pass.userPassId, record: await requestJson(path, { cache: "no-store" }) };
+      } catch (error) {
+        return { userPassId: pass.userPassId, error: error.message };
+      }
+    }));
+    const records = qrResults.filter((result) => result.record).map((result) => result.record);
+    qrRecordsByPassId = new Map(qrResults.map((result) => [result.userPassId, result]));
+    let cacheMessage = "";
+    try {
+      await saveCachedQrs(qrAccountId, records);
+    } catch (cacheError) {
+      cacheMessage = "QR codes are ready, but could not be saved for offline use.";
+    }
+
     if (currentPage() === "qr") {
-      appContent.innerHTML = `<section>${pageHeading("Your visits", "My QR pass")}${renderQrCard(record, false)}<button class="text-button cache-clear-button" data-action="clear-qr-cache">Remove saved QR</button></section>`;
-      startExpiryCountdown();
+      const carousel = qrPassCards.length
+        ? `<div class="qr-carousel"></div>`
+        : `<div class="empty-state"><h2>No pass yet</h2><p>Buy a pass to see it here.</p><a class="button button-dark" href="#buy">Explore passes</a></div>`;
+      appContent.innerHTML = `<section class="qr-pass-list">${pageHeading("Your visits", "My QR pass")}${carousel}${cacheMessage ? `<p class="qr-cache-message">${escapeHtml(cacheMessage)}</p>` : ""}<button class="text-button cache-clear-button" data-action="clear-qr-cache">Remove saved QR</button></section>`;
+      renderQrCarousel();
     }
   } catch (error) {
     if (currentPage() !== "qr") return;
@@ -368,10 +475,21 @@ async function renderQrPage() {
       return;
     }
     if (lastAccount && !navigator.onLine) {
-      const cached = await getCachedQr(lastAccount);
-      if (cached && new Date(cached.expiresAt).getTime() > Date.now()) {
-        appContent.innerHTML = `<section>${pageHeading("Your visits", "My QR pass")}${renderQrCard(cached, true)}<button class="text-button cache-clear-button" data-action="clear-qr-cache">Remove saved QR</button></section>`;
-        startExpiryCountdown();
+      const cached = await getCachedQrs(lastAccount);
+      const valid = cached.filter((record) => new Date(record.expiresAt).getTime() > Date.now());
+      if (valid.length) {
+        qrPassCards = sortQrPasses(valid.map((record) => ({
+          userPassId: record.userPassId,
+          passName: record.passName,
+          displayStatus: "ACTIVE"
+        })));
+        qrSelectedIndex = 0;
+        qrRecordsByPassId = new Map(valid.map((record) => [
+          record.userPassId,
+          { record, isCached: true }
+        ]));
+        appContent.innerHTML = `<section class="qr-pass-list">${pageHeading("Your visits", "My QR pass")}<div class="qr-carousel"></div><button class="text-button cache-clear-button" data-action="clear-qr-cache">Remove saved QR</button></section>`;
+        renderQrCarousel();
         return;
       }
     }
@@ -381,12 +499,35 @@ async function renderQrPage() {
 
 function startExpiryCountdown() {
   clearInterval(qrRefreshTimer);
-  const el = document.querySelector("[data-expiry]");
-  if (!el) return;
+  const expiryElements = [...document.querySelectorAll("[data-expiry]")];
+  const startElements = [...document.querySelectorAll("[data-starts-at]")];
+  if (!expiryElements.length && !startElements.length) return;
   const update = () => {
-    const s = Math.max(0, Math.floor((new Date(el.dataset.expiry).getTime() - Date.now()) / 1000));
-    el.innerHTML = s > 0 ? `Expires in <strong>${Math.floor(s/60).toString().padStart(2,"0")}:${(s%60).toString().padStart(2,"0")}</strong>` : "<strong>Expired.</strong>";
-    if (s <= 0) { document.querySelector(".qr-image")?.remove(); clearInterval(qrRefreshTimer); }
+    let activeCount = 0;
+    let pendingStartCount = 0;
+    expiryElements.forEach((el) => {
+      const s = Math.max(0, Math.floor((new Date(el.dataset.expiry).getTime() - Date.now()) / 1000));
+      el.innerHTML = s > 0 ? `Expires in <strong>${Math.floor(s/60).toString().padStart(2,"0")}:${(s%60).toString().padStart(2,"0")}</strong>` : "<strong>Expired.</strong>";
+      if (s <= 0) el.closest(".qr-card")?.querySelector(".qr-image")?.remove();
+      else activeCount += 1;
+    });
+    startElements.forEach((el) => {
+      const secondsLeft = Math.max(0, Math.floor((new Date(el.dataset.startsAt).getTime() - Date.now()) / 1000));
+      const days = Math.floor(secondsLeft / 86400);
+      if (secondsLeft > 0) pendingStartCount += 1;
+      if (secondsLeft === 0) {
+        el.textContent = "Available now";
+      } else if (secondsLeft >= 86400) {
+        const hours = Math.floor((secondsLeft % 86400) / 3600);
+        el.textContent = `${days} ${days === 1 ? "day" : "days"} ${hours} ${hours === 1 ? "hour" : "hours"}`;
+      } else {
+        const hours = Math.floor(secondsLeft / 3600);
+        const minutes = Math.floor((secondsLeft % 3600) / 60);
+        const seconds = secondsLeft % 60;
+        el.textContent = [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
+      }
+    });
+    if (!activeCount && !pendingStartCount) clearInterval(qrRefreshTimer);
   };
   update();
   qrRefreshTimer = setInterval(update, 1000);
@@ -428,6 +569,14 @@ function historyPassRemaining(pass) {
 function historyPassCardMarkup(pass) {
   const passId = escapeHtml(pass.userPassId);
   const expanded = historyExpandedPassIds.has(pass.userPassId);
+  const passCategory = historyPassCategory(pass);
+  const statusClass = passCategory === "USED" && pass.displayStatus === "ACTIVE"
+    ? "is-expired"
+    : pass.displayStatus === "ACTIVE" ? "is-active"
+      : pass.displayStatus === "EXPIRED" ? "is-expired" : "is-not-started";
+  const statusLabel = passCategory === "USED" && pass.displayStatus === "ACTIVE"
+    ? "USED"
+    : pass.displayStatus;
   const benefits = pass.benefits.length
     ? `<ul class="me-benefits">${pass.benefits.map((benefit) => {
         const used = benefit.used >= benefit.limit;
@@ -437,11 +586,11 @@ function historyPassCardMarkup(pass) {
       }).join("")}</ul>`
     : `<div class="empty-state"><h2>No benefits for this pass</h2></div>`;
 
-  return `<article class="history-pass-card">
+  return `<article class="history-pass-card" data-history-category="${passCategory}">
     <button type="button" class="history-pass-toggle" data-action="history-toggle" data-user-pass-id="${passId}" aria-expanded="${expanded}">
       <span class="history-pass-head">
         <h2>${escapeHtml(pass.passName)}</h2>
-        <span class="me-status history-pass-status ${pass.displayStatus === "ACTIVE" ? "is-active" : pass.displayStatus === "EXPIRED" ? "is-expired" : "is-not-started"}">${escapeHtml(pass.displayStatus)}</span>
+        <span class="me-status history-pass-status ${statusClass}">${escapeHtml(statusLabel)}</span>
       </span>
       <svg class="history-chevron${expanded ? " is-expanded" : ""}" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
     </button>
@@ -461,14 +610,44 @@ function historyPassCardMarkup(pass) {
   </article>`;
 }
 
+function historyPassCategory(pass) {
+  if (pass.displayStatus === "NOT STARTED") return "NOT_STARTED";
+  if (pass.displayStatus === "EXPIRED"
+      || (pass.benefits.length > 0 && pass.benefits.every((benefit) => benefit.used >= benefit.limit))) {
+    return "USED";
+  }
+  return pass.displayStatus === "ACTIVE" ? "ACTIVE" : "USED";
+}
+
+function sortHistoryPasses(passCards) {
+  return [...passCards].sort((a, b) => {
+    const startComparison = (a.startDate || "9999-12-31").localeCompare(b.startDate || "9999-12-31");
+    if (startComparison !== 0) return startComparison;
+    return (a.endDate || "9999-12-31").localeCompare(b.endDate || "9999-12-31");
+  });
+}
+
 function historyOverviewMarkup(account, passCards) {
-  const passContent = passCards.length
-    ? passCards.map(historyPassCardMarkup).join("")
-    : `<div class="me-card me-empty"><strong>No pass yet</strong><a class="button button-dark" href="#buy">Buy a pass</a></div>`;
+  const visiblePasses = passCards.filter((pass) =>
+    historyPassFilter === "ALL" || historyPassCategory(pass) === historyPassFilter);
+  const passContent = visiblePasses.length
+    ? visiblePasses.map(historyPassCardMarkup).join("")
+    : passCards.length
+      ? `<div class="me-card me-empty"><strong>No passes in this category.</strong></div>`
+      : `<div class="me-card me-empty"><strong>No pass yet</strong><a class="button button-dark" href="#buy">Buy a pass</a></div>`;
+  const filters = [
+    ["ALL", "All"],
+    ["ACTIVE", "Active"],
+    ["NOT_STARTED", "Not started"],
+    ["USED", "Expired / used"]
+  ];
   return `<section class="history-page">
     ${pageHeading("Your visits", "Pass history")}
     <article class="me-card me-identity history-profile"><strong>${escapeHtml(account.displayName)}</strong></article>
-    ${passContent}
+    <div class="history-filters" role="group" aria-label="Filter passes">
+      ${filters.map(([filter, label]) => `<button type="button" class="history-filter${historyPassFilter === filter ? " is-selected" : ""}" data-action="history-filter" data-filter="${filter}" aria-pressed="${historyPassFilter === filter}">${label}</button>`).join("")}
+    </div>
+    <div class="history-pass-list">${passContent}</div>
   </section>`;
 }
 
@@ -494,15 +673,16 @@ async function renderHistoryPage(userPassId = null) {
       requestJson("/api/v1/auth/me", { cache: "no-store" }),
       requestJson(MY_PASSES_ENDPOINT, { cache: "no-store" })
     ]);
-    historyPassCards = passCards;
+    historyAccount = account;
+    historyPassCards = sortHistoryPasses(passCards);
     const availableIds = new Set(passCards.map((pass) => pass.userPassId));
     historyExpandedPassIds = new Set(
       [...historyExpandedPassIds].filter((passId) => availableIds.has(passId)));
     if (!historyHasInitializedCards) {
-      if (passCards.length > 0) historyExpandedPassIds.add(passCards[0].userPassId);
+      if (historyPassCards.length > 0) historyExpandedPassIds.add(historyPassCards[0].userPassId);
       historyHasInitializedCards = true;
     }
-    appContent.innerHTML = historyOverviewMarkup(account, passCards);
+    appContent.innerHTML = historyOverviewMarkup(account, historyPassCards);
   } catch (error) {
     if (error.status === 401) appContent.innerHTML = `<section>${pageHeading("Your visits", "Pass history")}<div class="empty-state"><h2>Sign in required</h2></div></section>`;
     else appContent.innerHTML = `<section>${pageHeading("Your visits", "Pass history")}<div class="empty-state"><h2>History unavailable</h2></div></section>`;
@@ -515,42 +695,12 @@ function formatPassDate(value) {
     ? new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric" }).format(d) : "-";
 }
 
-function passRemaining(pass) {
-  if (pass.status !== "ACTIVE" || !pass.endDate) return "-";
-  const ms = new Date(`${pass.endDate}T23:59:59`).getTime() - Date.now();
-  if (!(ms > 0)) return "Expired";
-  const hours = Math.floor(ms / 3600000);
-  return `${Math.floor(hours / 24)} days ${hours % 24} hours`;
-}
-
-function myPassCard(authState) {
-  if (authState.passError) return `<div class="me-card"><p class="form-message">Could not load your pass. Please try again later.</p></div>`;
-  const pass = authState.pass;
-  if (!pass) return `<div class="me-card me-empty"><strong>No pass yet</strong><small>Buy a pass to see its benefits here.</small><a class="button button-dark" href="#buy">Buy a pass</a></div>`;
-  const active = pass.status === "ACTIVE";
-  const benefits = pass.benefits.length === 0
-    ? `<p class="me-muted">This pass has no listed benefits.</p>`
-    : pass.benefits.map((b) => {
-        const used = b.used >= b.limit;
-        return `<li class="me-benefit"><span><strong>${escapeHtml(b.placeName)}</strong><small>${escapeHtml(b.detail)}</small></span>
-          <span class="me-badge ${used ? "is-used" : "is-available"}">${used ? "Used" : "Available"} (${b.used}/${b.limit})</span></li>`;
-      }).join("");
-  return `<div class="me-card">
-    <div class="me-pass-head"><span class="me-pass-info">
-      <strong>${escapeHtml(pass.passName)}</strong>
-      <small>Remaining: ${escapeHtml(passRemaining(pass))}</small>
-      <small>Start: ${formatPassDate(pass.startDate)}</small>
-      <small>End: ${formatPassDate(pass.endDate)}</small></span>
-      <span class="me-status ${active ? "is-active" : ""}">${active ? "Active" : "Not active"}</span></div>
-    <h2 class="me-subtitle">Pass benefits</h2><ul class="me-benefits">${benefits}</ul></div>`;
-}
-
 const PRIVACY_LABELS = {
   MARKETING_EMAILS: ["Marketing emails", "Offers and news about Chiang Rai Pass"],
   USAGE_ANALYTICS: ["Usage analytics", "Help improve the app"]
 };
 
-function privacyCard(authState) {
+function privacyPreferencesCard(authState) {
   const p = authState.privacy;
   const failed = authState.privacyError || !p;
   const canChange = !failed && p.available;
@@ -571,13 +721,10 @@ function privacyCard(authState) {
   const note = failed
     ? `<p class="form-message">Could not load your privacy preferences. Please try again later.</p>`
     : (!p.available ? `<p class="me-muted">Changing preferences will be available once the Privacy Notice is published.</p>` : "");
-  return `<div class="me-card"><h2 class="me-subtitle">Privacy Notice</h2>
-      <p class="me-muted">Learn more about how your personal information is collected, used, and managed.</p>
-      <a class="me-link" href="privacy.html">Read Privacy Notice</a></div>
-    <div class="me-card" id="privacy-card" data-version="${escapeHtml(canChange ? p.noticeVersion : "")}">
-      <h2 class="me-subtitle">Privacy preferences</h2>
-      <p class="me-muted">Manage optional preferences</p>${note}
-      <ul class="me-benefits">${rows}</ul><p id="privacy-message" class="form-message"></p></div>`;
+  return `<div class="me-card" id="privacy-card" data-version="${escapeHtml(canChange ? p.noticeVersion : "")}">
+    <h2 class="me-subtitle">Privacy preferences</h2>
+    <p class="me-muted">Manage optional preferences</p>${note}
+    <ul class="me-benefits">${rows}</ul><p id="privacy-message" class="form-message"></p></div>`;
 }
 
 document.addEventListener("click", async (event) => {
@@ -595,8 +742,89 @@ document.addEventListener("click", async (event) => {
         choices: [{ purpose: button.dataset.privacyPurpose, granted: button.dataset.privacyGranted !== "true" }]
       })
     });
-    profileFeedback = "Privacy choice saved."; await renderProfilePage();
+    profileFeedback = "Privacy choice saved.";
+    if (currentPage() === "privacy-preferences") await renderPrivacyPreferencesPage();
+    else if (currentPage() === "profile") await renderProfilePage();
   } catch (e) { msg.textContent = e.message; button.disabled = false; }
+});
+
+// Privacy Notice modal, shared by Register and Profile. It is created once and lives outside
+// #app-content, so showing it never re-renders the page or touches the route.
+const PRIVACY_NOTICE_PAGE = "privacy.html?embed=1";
+const REGISTER_CONSENT = '#account-form input[name="privacyNoticeAcknowledged"]';
+
+function ensurePrivacyDialog() {
+  let dialog = document.querySelector("#privacy-dialog");
+  if (dialog) return dialog;
+  dialog = document.createElement("dialog");
+  dialog.id = "privacy-dialog";
+  dialog.className = "privacy-dialog";
+  dialog.setAttribute("aria-labelledby", "privacy-dialog-title");
+  dialog.innerHTML = `<div class="privacy-dialog-body">
+      <div class="privacy-dialog-head">
+        <h2 id="privacy-dialog-title">Privacy Notice</h2>
+        <button type="button" class="dialog-close" data-privacy-close aria-label="Close Privacy Notice">×</button>
+      </div>
+      <iframe class="privacy-dialog-frame" title="Privacy Notice"></iframe>
+      <div class="privacy-dialog-foot" hidden>
+        <label class="check-row"><input type="checkbox" id="privacy-dialog-accept"><span>I have read and accept the Privacy Notice.</span></label>
+        <div class="privacy-dialog-actions">
+          <button type="button" class="button button-outline" data-privacy-close>Close</button>
+          <button type="button" class="button button-dark" id="privacy-dialog-confirm" disabled>Confirm</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+  // A click on the dimmed area outside the dialog closes it, without accepting anything.
+  dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
+  return dialog;
+}
+
+function openPrivacyDialog() {
+  const dialog = ensurePrivacyDialog();
+  const frame = dialog.querySelector("iframe");
+  if (!frame.getAttribute("src")) frame.setAttribute("src", PRIVACY_NOTICE_PAGE);
+  const consent = document.querySelector(REGISTER_CONSENT);
+  const accept = dialog.querySelector("#privacy-dialog-accept");
+  // On Register the visitor can accept here; elsewhere (Profile) the notice is read-only.
+  dialog.querySelector(".privacy-dialog-foot").hidden = !consent;
+  accept.checked = Boolean(consent && consent.checked);
+  dialog.querySelector("#privacy-dialog-confirm").disabled = !accept.checked;
+  if (!dialog.open) dialog.showModal();
+}
+
+document.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-privacy-modal]");
+  if (link) {
+    // Let Ctrl/Cmd/Shift-click and middle-click still open the page in a new tab.
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    openPrivacyDialog();
+    return;
+  }
+  if (event.target.closest("[data-privacy-close]")) {
+    document.querySelector("#privacy-dialog")?.close();
+    return;
+  }
+  if (event.target.closest("#privacy-dialog-confirm")) {
+    const dialog = document.querySelector("#privacy-dialog");
+    const consent = document.querySelector(REGISTER_CONSENT);
+    if (consent && dialog.querySelector("#privacy-dialog-accept").checked) {
+      consent.checked = true;
+      consent.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    dialog.close();
+  }
+});
+
+document.addEventListener("change", (event) => {
+  if (event.target.id !== "privacy-dialog-accept") return;
+  document.querySelector("#privacy-dialog-confirm").disabled = !event.target.checked;
+});
+
+document.addEventListener("click", (event) => {
+  if (event.target.closest("[data-profile-retry]")) void renderProfilePage();
+  if (event.target.closest("[data-privacy-retry]")) void renderPrivacyPreferencesPage();
 });
 
 function avatarMarkup(url) {
@@ -605,11 +833,18 @@ function avatarMarkup(url) {
 }
 
 function settingsCard(account) {
-  const action = account.hasPassword
-    ? `<a class="button button-outline button-full settings-password-link" href="#change-password">Change password</a>`
-    : `<p class="me-muted">This account has no password to change.</p>`;
+  const passwordItem = account.hasPassword
+    ? `<a class="settings-menu-item" href="#change-password"><span>Change password</span><span aria-hidden="true">›</span></a>`
+    : `<div class="settings-menu-item is-disabled"><span>Change password</span><small>This account has no password.</small></div>`;
   return `<div class="me-card"><h2 class="me-subtitle">Settings</h2>
-    ${action}</div>`;
+    <nav class="settings-menu" aria-label="Settings">
+      ${passwordItem}
+      <a class="settings-menu-item" href="privacy.html" target="_blank" rel="noopener" data-privacy-modal>
+        <span>Privacy Notice</span><span aria-hidden="true">↗</span>
+      </a>
+      <a class="settings-menu-item" href="#privacy-preferences"><span>Privacy preferences</span><span aria-hidden="true">›</span></a>
+    </nav>
+  </div>`;
 }
 
 async function loadAvatarUrl() {
@@ -737,6 +972,12 @@ async function renderChangePasswordPage() {
 }
 
 function profilePage(authState) {
+    if (authState.loadFailed) {
+    return `<section>${pageHeading("Your account", "Profile")}
+      <div class="empty-state"><h2>Could not load your account</h2>
+      <p>We could not check your sign-in status just now. Please try again.</p>
+      <button type="button" class="button button-outline" data-profile-retry>Try again</button></div></section>`;
+    }
       if (authState.account) {
     const account = authState.account;
     return `<section>${pageHeading("Your account", "Profile")}
@@ -761,9 +1002,7 @@ function profilePage(authState) {
           <p class="form-message"></p>
         </form>
       </div>
-      ${myPassCard(authState)}
       ${settingsCard(account)}
-      ${privacyCard(authState)}
       <button type="button" class="button button-outline button-full" data-action="logout">Sign out</button></section>`;
   }
   const reg = profileMode === "register";
@@ -804,70 +1043,53 @@ function profilePage(authState) {
       <label class="field-label">Password</label><input name="password" type="password" required>
       ${reg ? "" : `<button type="button" class="password-reset-link" data-action="profile-mode" data-mode="forgot">Forgot password?</button>`}
       ${reg ? `<small>At least 8 characters, with at least 1 number and 1 special character (! @ # $ %). English letters only.</small>` : ""}
-      ${reg ? `<div class="consent-box"><p><a class="me-link" href="privacy.html">Read Privacy Notice</a></p><label class="check-row"><input type="checkbox" name="privacyNoticeAcknowledged" required><span>I acknowledge the Privacy Notice.</span></label></div>` : ""}
+      ${reg ? `<div class="consent-box"><p><a class="me-link" href="privacy.html" target="_blank" rel="noopener" data-privacy-modal>Read Privacy Notice ↗</a></p><label class="check-row"><input type="checkbox" name="privacyNoticeAcknowledged" required><span>I acknowledge the Privacy Notice.</span></label></div>` : ""}
       <button type="submit" class="button button-dark button-full">${reg ? "Create account" : "Sign in"} →</button><p id="account-message" class="form-message">${escapeHtml(authState.notice || authState.error)}</p>
     </form></div></section>`;
 }
 
-async function renderProfilePage(loggedInAccount = null) {
-  const authState = {
-    account: loggedInAccount,
-    config: { registrationEnabled: true },
-    pass: null,
-    passError: false,
-    privacy: null,
-    privacyError: false,
-    notice: "",
-    error: ""
-  };
+async function renderProfilePage() {
+  const authState = { account: null, config: { registrationEnabled: false }, notice: "", error: "", loadFailed: false };
   appContent.innerHTML = `<section>${pageHeading("Your account", "Loading...")}</section>`;
-
-  // 1. If there is no account information sent directly from the login page, then request /api/v1/auth/me
-  if (!authState.account) {
+  try {
+    authState.config = await requestJson("/api/v1/auth/config", { cache: "no-store" });
     try {
       authState.account = await requestJson("/api/v1/auth/me", { cache: "no-store" });
       authState.notice = await clearQrForAccountSwitch(authState.account.accountId);
+      try { authState.avatarUrl = await loadAvatarUrl(); } catch (e) { authState.avatarUrl = ""; }
+      setHeaderAvatar(authState.avatarUrl);
     } catch (e) {
-      // ยังไม่ได้ล็อกอิน (401)
+      // 401 means the visitor is signed out. Any other failure (timeout, 5xx, network) is a
+      // failure to load, not a sign-out, so it must not show the Sign in form.
+      if (!authState.account && e.status !== 401) authState.loadFailed = true;
     }
-  }
+  } catch (e) { authState.loadFailed = true; }
+  if (profileFeedback) { authState.notice = profileFeedback; profileFeedback = ""; }
+  if (currentPage() === "profile") appContent.innerHTML = profilePage(authState);
+}
 
-  // 2. If logged in, fetch the pass (My Pass) and privacy settings to display on the Profile page
-  if (authState.account) {
-    try { authState.avatarUrl = await loadAvatarUrl(); } catch (e) { authState.avatarUrl = ""; }
-    setHeaderAvatar(authState.avatarUrl);
-    const [passResult, privacyResult] = await Promise.allSettled([
-      requestJson("/api/v1/me/pass", { cache: "no-store" }),
-      requestJson("/api/v1/me/privacy-preferences", { cache: "no-store" })
-    ]);
-
-    if (passResult.status === "fulfilled") {
-      authState.pass = passResult.value?.pass || null;
-    } else {
-      authState.passError = true;
-    }
-
-    if (privacyResult.status === "fulfilled") {
-      authState.privacy = privacyResult.value;
-    } else {
-      authState.privacyError = true;
-    }
-  } else {
-    // 3. If not logged in, fetch the config for the login form
-    try {
-      authState.config = await requestJson("/api/v1/auth/config", { cache: "no-store" });
-    } catch (e) {
-      authState.config = { registrationEnabled: true };
-    }
+async function renderPrivacyPreferencesPage() {
+  appContent.innerHTML = `<section>${pageHeading("Your account", "Privacy preferences", "Loading...")}</section>`;
+  let privacy;
+  try {
+    await requestJson("/api/v1/auth/me", { cache: "no-store" });
+    privacy = await requestJson("/api/v1/me/privacy-preferences", { cache: "no-store" });
+  } catch (error) {
+    if (currentPage() !== "privacy-preferences") return;
+    const body = error.status === 401
+      ? `<div class="empty-state"><h2>Sign in required</h2><p>Your session may have expired. Return to Profile to sign in again.</p></div>`
+      : `<div class="empty-state"><h2>Privacy preferences unavailable</h2><p>We could not load your preferences. Your sign-in status has not been changed.</p><button type="button" class="button button-outline" data-privacy-retry>Try again</button></div>`;
+    appContent.innerHTML = `<section>${pageHeading("Your account", "Privacy preferences")}
+      <a class="button button-outline privacy-back-link" href="#profile">← Back to Profile</a>${body}</section>`;
+    return;
   }
-
-  if (profileFeedback) {
-    authState.notice = profileFeedback;
-    profileFeedback = "";
-  }
-  if (currentPage() === "profile") {
-    appContent.innerHTML = profilePage(authState);
-  }
+  if (currentPage() !== "privacy-preferences") return;
+  const notice = profileFeedback;
+  profileFeedback = "";
+  appContent.innerHTML = `<section>${pageHeading("Your account", "Privacy preferences", "Manage optional preferences.")}
+    <a class="button button-outline privacy-back-link" href="#profile">← Back to Profile</a>
+    ${notice ? `<p class="form-message">${escapeHtml(notice)}</p>` : ""}
+    ${privacyPreferencesCard({ privacy, privacyError: false })}</section>`;
 }
 
 document.addEventListener("submit", async (event) => {
@@ -931,7 +1153,7 @@ function setProfileMode(mode) { profileMode = mode === "register" ? "register" :
 
 async function render() {
   const page = currentPage();
-  const navPage = page === "change-password" ? "profile" : page;
+  const navPage = ["change-password", "privacy-preferences"].includes(page) ? "profile" : page;
   document.querySelectorAll(".bottom-nav [data-page]").forEach(l => l.dataset.page === navPage ? l.setAttribute("aria-current", "page") : l.removeAttribute("aria-current"));
   updateCartCount();
   if (!isCatalogLoaded && (page === "home" || page === "buy")) { appContent.innerHTML = `<div class="loading-panel">Loading...</div>`; await fetchCatalogData(); }
@@ -941,6 +1163,7 @@ async function render() {
     case "history": void renderHistoryPage(); break;
     case "profile": void renderProfilePage(); break;
     case "change-password": void renderChangePasswordPage(); break;
+    case "privacy-preferences": void renderPrivacyPreferencesPage(); break;
     case "reset": renderResetPage(); break;
     default: appContent.innerHTML = homePage();
   }
@@ -958,6 +1181,14 @@ document.addEventListener("click", async (event) => {
   const control = event.target.closest("[data-action]"); if (!control) return;
 
   switch (control.dataset.action) {
+    case "qr-previous":
+      qrSelectedIndex -= 1;
+      renderQrCarousel();
+      break;
+    case "qr-next":
+      qrSelectedIndex += 1;
+      renderQrCarousel();
+      break;
     case "history-toggle": {
       const userPassId = control.dataset.userPassId;
       const body = control.parentElement.querySelector(".history-pass-collapsible");
@@ -969,6 +1200,10 @@ document.addEventListener("click", async (event) => {
       else historyExpandedPassIds.add(userPassId);
       break;
     }
+    case "history-filter":
+      historyPassFilter = control.dataset.filter;
+      if (historyAccount) appContent.innerHTML = historyOverviewMarkup(historyAccount, historyPassCards);
+      break;
     case "add-to-cart":
       const id = control.dataset.id;
       const startInp = document.getElementById("trip-start");
@@ -1009,8 +1244,46 @@ document.addEventListener("click", async (event) => {
     case "history-recent": await renderHistoryPage(); break;
     case "logout":
       try { const csrf = await csrfHeaders(); await fetch(apiUrl("/api/v1/auth/logout"), { method: "POST", headers: csrf, credentials: "include" }); setHeaderAvatar(""); if (avatarObjectUrl) { URL.revokeObjectURL(avatarObjectUrl); avatarObjectUrl = ""; } try { await clearAllCachedQr(); localStorage.removeItem(LAST_QR_ACCOUNT_KEY); } catch (e) {} profileMode = "login"; profileFeedback = "Signed out."; render(); } catch (e) {} break;
-    case "refresh-qr": if (!control.disabled) await renderQrPage(); break;
-    case "clear-qr-cache": let acc = localStorage.getItem(LAST_QR_ACCOUNT_KEY); if (acc) await clearCachedQr(acc); localStorage.removeItem(LAST_QR_ACCOUNT_KEY); if (currentPage() === "qr") await renderQrPage(); break;
+    case "refresh-qr":
+      if (!control.disabled) {
+        control.disabled = true;
+        try {
+          const userPassId = control.dataset.userPassId;
+          const path = `${QR_ENDPOINT}?userPassId=${encodeURIComponent(userPassId)}`;
+          const record = await requestJson(path, { cache: "no-store" });
+          const pass = qrPassCards.find((item) => item.userPassId === userPassId);
+          if (pass) {
+            qrRecordsByPassId.set(userPassId, { userPassId, record });
+            renderQrCarousel();
+          }
+          try {
+            const cached = await getCachedQrs(record.accountId);
+            await saveCachedQrs(record.accountId, [
+              ...cached.filter((item) => item.userPassId !== record.userPassId),
+              record
+            ]);
+          } catch (cacheError) {
+            const message = document.createElement("p");
+            message.className = "qr-cache-message";
+            message.textContent = "QR updated, but could not be saved for offline use.";
+            appContent.querySelector(".qr-pass-list")?.append(message);
+          }
+        } catch (error) {
+          qrRecordsByPassId.set(control.dataset.userPassId, { error: error.message });
+          renderQrCarousel();
+        }
+      }
+      break;
+    case "clear-qr-cache": {
+      const acc = localStorage.getItem(LAST_QR_ACCOUNT_KEY);
+      if (acc) await clearCachedQr(acc);
+      control.remove();
+      const message = document.createElement("p");
+      message.className = "qr-cache-message";
+      message.textContent = "Saved QR codes removed from this device.";
+      appContent.querySelector(".qr-pass-list")?.append(message);
+      break;
+    }
     case "close-dialog": control.closest("dialog")?.close(); break;
   }
 });

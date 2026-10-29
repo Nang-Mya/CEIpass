@@ -39,6 +39,11 @@ public class PassQrService {
 
     @Transactional(readOnly = true)
     public QrPassResponse issueQrForAccount(UUID accountId) {
+        return issueQrForAccount(accountId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public QrPassResponse issueQrForAccount(UUID accountId, UUID userPassId) {
         List<UserPassEntity> ownedPasses = userPassRepository.findByAccountIdWithPass(accountId);
         if (ownedPasses.isEmpty()) {
             throw new ResponseStatusException(
@@ -47,10 +52,14 @@ public class PassQrService {
 
         LocalDate today = LocalDate.now(ZONE);
         UserPassEntity activePass = ownedPasses.stream()
+                .filter(pass -> userPassId == null || userPassId.equals(pass.getUserPassId()))
                 .filter(pass -> isActiveToday(pass, today))
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "You do not have an active pass for today."));
+                        userPassId == null ? HttpStatus.NOT_FOUND : HttpStatus.CONFLICT,
+                        userPassId == null
+                                ? "You do not have an active pass for today."
+                                : "This pass is not active today."));
 
         Instant now = Instant.now();
         Instant expiresAt = now.plus(QR_LIFETIME);

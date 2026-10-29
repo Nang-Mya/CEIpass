@@ -34,6 +34,7 @@ class HealthControllerTest {
     void returnsApiHealth() throws Exception {
         mockMvc.perform(get("/api/v1/health"))
                 .andExpect(status().isOk())
+                .andExpect(header().string("X-Frame-Options", "SAMEORIGIN"))
                 .andExpect(jsonPath("$.status").value("ok"))
                 .andExpect(jsonPath("$.service").value("cei-pass-api"));
     }
