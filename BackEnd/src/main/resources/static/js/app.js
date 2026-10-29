@@ -230,9 +230,9 @@ function homePage() {
   const featured = attractions.slice(0, 3).map((attr) => attractionCard(attr, true)).join("");
   return `<section class="home-page">
     <div class="hero-card"><div class="hero-copy"><p class="eyebrow eyebrow-light">Your Chiang Rai adventure</p><h1>See more.<br>Worry less.</h1>
+    <a></a>
     <a class="button button-light" href="#buy">Explore passes <span aria-hidden="true">→</span></a></div></div>
     <section class="section-block quick-actions" aria-label="Quick access">
-      <a class="quick-card" href="#buy"><span class="quick-icon quick-icon-green" aria-hidden="true">🎟️</span><span><strong>Buy a pass</strong><small>Find your way to more</small></span></a>
       <a class="quick-card" href="#qr"><span class="quick-icon quick-icon-amber" aria-hidden="true">📱</span><span><strong>My QR pass</strong><small>Ready when you are</small></span></a>
     </section>
     <section class="section-block">
