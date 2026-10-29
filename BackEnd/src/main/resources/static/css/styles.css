@@ -70,7 +70,7 @@ input:focus-visible {
   letter-spacing: -0.03em;
   text-decoration: none;
 }
-
+/**
 .brand-mark {
   display: grid;
   width: 2.15rem;
@@ -82,6 +82,18 @@ input:focus-visible {
   font-family: Georgia, serif;
   font-size: 1.1rem;
   font-weight: 700;
+}
+**/
+
+.brand-mark {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  background-image: url("/icons/pass-icon.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  vertical-align: middle;
 }
 
 .brand-light {
