@@ -216,6 +216,8 @@ input:focus-visible {
 }
 
 .button-light {
+  /* margin-inline: 0.25rem 0.25rem; */
+  margin-block: 5rem 0.25rem;
   background: #f4f1e7;
   color: #203c2b;
 }
@@ -324,17 +326,18 @@ input:focus-visible {
 }
 
 .section-block {
-  margin-top: 2rem;
+  margin-top: .5rem;
 }
 
 .quick-actions {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: 0.75rem;
 }
 
 .quick-card {
-  display: grid;
+  display: flex;
+  min-width: 100%;
   min-height: 5.2rem;
   padding: 0.82rem;
   grid-template-columns: auto 1fr auto;
