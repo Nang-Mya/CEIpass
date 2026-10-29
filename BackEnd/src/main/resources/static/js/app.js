@@ -207,7 +207,7 @@ function updateCartCount() {
 function announce(message) { announcer.textContent = message; }
 function currentPage() {
   const page = window.location.hash.slice(1).split("?")[0];
-  return ["home", "buy", "qr", "history", "profile", "change-password", "reset"].includes(page) ? page : "home";
+  return ["home", "buy", "qr", "history", "profile", "change-password", "privacy-preferences", "reset"].includes(page) ? page : "home";
 }
 
 function pageHeading(eyebrow, title, description = "") {
@@ -695,42 +695,12 @@ function formatPassDate(value) {
     ? new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric" }).format(d) : "-";
 }
 
-function passRemaining(pass) {
-  if (pass.status !== "ACTIVE" || !pass.endDate) return "-";
-  const ms = new Date(`${pass.endDate}T23:59:59`).getTime() - Date.now();
-  if (!(ms > 0)) return "Expired";
-  const hours = Math.floor(ms / 3600000);
-  return `${Math.floor(hours / 24)} days ${hours % 24} hours`;
-}
-
-function myPassCard(authState) {
-  if (authState.passError) return `<div class="me-card"><p class="form-message">Could not load your pass. Please try again later.</p></div>`;
-  const pass = authState.pass;
-  if (!pass) return `<div class="me-card me-empty"><strong>No pass yet</strong><small>Buy a pass to see its benefits here.</small><a class="button button-dark" href="#buy">Buy a pass</a></div>`;
-  const active = pass.status === "ACTIVE";
-  const benefits = pass.benefits.length === 0
-    ? `<p class="me-muted">This pass has no listed benefits.</p>`
-    : pass.benefits.map((b) => {
-        const used = b.used >= b.limit;
-        return `<li class="me-benefit"><span><strong>${escapeHtml(b.placeName)}</strong><small>${escapeHtml(b.detail)}</small></span>
-          <span class="me-badge ${used ? "is-used" : "is-available"}">${used ? "Used" : "Available"} (${b.used}/${b.limit})</span></li>`;
-      }).join("");
-  return `<div class="me-card">
-    <div class="me-pass-head"><span class="me-pass-info">
-      <strong>${escapeHtml(pass.passName)}</strong>
-      <small>Remaining: ${escapeHtml(passRemaining(pass))}</small>
-      <small>Start: ${formatPassDate(pass.startDate)}</small>
-      <small>End: ${formatPassDate(pass.endDate)}</small></span>
-      <span class="me-status ${active ? "is-active" : ""}">${active ? "Active" : "Not active"}</span></div>
-    <h2 class="me-subtitle">Pass benefits</h2><ul class="me-benefits">${benefits}</ul></div>`;
-}
-
 const PRIVACY_LABELS = {
   MARKETING_EMAILS: ["Marketing emails", "Offers and news about Chiang Rai Pass"],
   USAGE_ANALYTICS: ["Usage analytics", "Help improve the app"]
 };
 
-function privacyCard(authState) {
+function privacyPreferencesCard(authState) {
   const p = authState.privacy;
   const failed = authState.privacyError || !p;
   const canChange = !failed && p.available;
@@ -751,13 +721,10 @@ function privacyCard(authState) {
   const note = failed
     ? `<p class="form-message">Could not load your privacy preferences. Please try again later.</p>`
     : (!p.available ? `<p class="me-muted">Changing preferences will be available once the Privacy Notice is published.</p>` : "");
-  return `<div class="me-card"><h2 class="me-subtitle">Privacy Notice</h2>
-      <p class="me-muted">Learn more about how your personal information is collected, used, and managed.</p>
-      <a class="me-link" href="privacy.html">Read Privacy Notice</a></div>
-    <div class="me-card" id="privacy-card" data-version="${escapeHtml(canChange ? p.noticeVersion : "")}">
-      <h2 class="me-subtitle">Privacy preferences</h2>
-      <p class="me-muted">Manage optional preferences</p>${note}
-      <ul class="me-benefits">${rows}</ul><p id="privacy-message" class="form-message"></p></div>`;
+  return `<div class="me-card" id="privacy-card" data-version="${escapeHtml(canChange ? p.noticeVersion : "")}">
+    <h2 class="me-subtitle">Privacy preferences</h2>
+    <p class="me-muted">Manage optional preferences</p>${note}
+    <ul class="me-benefits">${rows}</ul><p id="privacy-message" class="form-message"></p></div>`;
 }
 
 document.addEventListener("click", async (event) => {
@@ -775,8 +742,89 @@ document.addEventListener("click", async (event) => {
         choices: [{ purpose: button.dataset.privacyPurpose, granted: button.dataset.privacyGranted !== "true" }]
       })
     });
-    profileFeedback = "Privacy choice saved."; await renderProfilePage();
+    profileFeedback = "Privacy choice saved.";
+    if (currentPage() === "privacy-preferences") await renderPrivacyPreferencesPage();
+    else if (currentPage() === "profile") await renderProfilePage();
   } catch (e) { msg.textContent = e.message; button.disabled = false; }
+});
+
+// Privacy Notice modal, shared by Register and Profile. It is created once and lives outside
+// #app-content, so showing it never re-renders the page or touches the route.
+const PRIVACY_NOTICE_PAGE = "privacy.html?embed=1";
+const REGISTER_CONSENT = '#account-form input[name="privacyNoticeAcknowledged"]';
+
+function ensurePrivacyDialog() {
+  let dialog = document.querySelector("#privacy-dialog");
+  if (dialog) return dialog;
+  dialog = document.createElement("dialog");
+  dialog.id = "privacy-dialog";
+  dialog.className = "privacy-dialog";
+  dialog.setAttribute("aria-labelledby", "privacy-dialog-title");
+  dialog.innerHTML = `<div class="privacy-dialog-body">
+      <div class="privacy-dialog-head">
+        <h2 id="privacy-dialog-title">Privacy Notice</h2>
+        <button type="button" class="dialog-close" data-privacy-close aria-label="Close Privacy Notice">×</button>
+      </div>
+      <iframe class="privacy-dialog-frame" title="Privacy Notice"></iframe>
+      <div class="privacy-dialog-foot" hidden>
+        <label class="check-row"><input type="checkbox" id="privacy-dialog-accept"><span>I have read and accept the Privacy Notice.</span></label>
+        <div class="privacy-dialog-actions">
+          <button type="button" class="button button-outline" data-privacy-close>Close</button>
+          <button type="button" class="button button-dark" id="privacy-dialog-confirm" disabled>Confirm</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+  // A click on the dimmed area outside the dialog closes it, without accepting anything.
+  dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
+  return dialog;
+}
+
+function openPrivacyDialog() {
+  const dialog = ensurePrivacyDialog();
+  const frame = dialog.querySelector("iframe");
+  if (!frame.getAttribute("src")) frame.setAttribute("src", PRIVACY_NOTICE_PAGE);
+  const consent = document.querySelector(REGISTER_CONSENT);
+  const accept = dialog.querySelector("#privacy-dialog-accept");
+  // On Register the visitor can accept here; elsewhere (Profile) the notice is read-only.
+  dialog.querySelector(".privacy-dialog-foot").hidden = !consent;
+  accept.checked = Boolean(consent && consent.checked);
+  dialog.querySelector("#privacy-dialog-confirm").disabled = !accept.checked;
+  if (!dialog.open) dialog.showModal();
+}
+
+document.addEventListener("click", (event) => {
+  const link = event.target.closest("[data-privacy-modal]");
+  if (link) {
+    // Let Ctrl/Cmd/Shift-click and middle-click still open the page in a new tab.
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    openPrivacyDialog();
+    return;
+  }
+  if (event.target.closest("[data-privacy-close]")) {
+    document.querySelector("#privacy-dialog")?.close();
+    return;
+  }
+  if (event.target.closest("#privacy-dialog-confirm")) {
+    const dialog = document.querySelector("#privacy-dialog");
+    const consent = document.querySelector(REGISTER_CONSENT);
+    if (consent && dialog.querySelector("#privacy-dialog-accept").checked) {
+      consent.checked = true;
+      consent.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    dialog.close();
+  }
+});
+
+document.addEventListener("change", (event) => {
+  if (event.target.id !== "privacy-dialog-accept") return;
+  document.querySelector("#privacy-dialog-confirm").disabled = !event.target.checked;
+});
+
+document.addEventListener("click", (event) => {
+  if (event.target.closest("[data-profile-retry]")) void renderProfilePage();
+  if (event.target.closest("[data-privacy-retry]")) void renderPrivacyPreferencesPage();
 });
 
 function avatarMarkup(url) {
@@ -785,11 +833,18 @@ function avatarMarkup(url) {
 }
 
 function settingsCard(account) {
-  const action = account.hasPassword
-    ? `<a class="button button-outline button-full settings-password-link" href="#change-password">Change password</a>`
-    : `<p class="me-muted">This account has no password to change.</p>`;
+  const passwordItem = account.hasPassword
+    ? `<a class="settings-menu-item" href="#change-password"><span>Change password</span><span aria-hidden="true">›</span></a>`
+    : `<div class="settings-menu-item is-disabled"><span>Change password</span><small>This account has no password.</small></div>`;
   return `<div class="me-card"><h2 class="me-subtitle">Settings</h2>
-    ${action}</div>`;
+    <nav class="settings-menu" aria-label="Settings">
+      ${passwordItem}
+      <a class="settings-menu-item" href="privacy.html" target="_blank" rel="noopener" data-privacy-modal>
+        <span>Privacy Notice</span><span aria-hidden="true">↗</span>
+      </a>
+      <a class="settings-menu-item" href="#privacy-preferences"><span>Privacy preferences</span><span aria-hidden="true">›</span></a>
+    </nav>
+  </div>`;
 }
 
 async function loadAvatarUrl() {
@@ -917,6 +972,12 @@ async function renderChangePasswordPage() {
 }
 
 function profilePage(authState) {
+    if (authState.loadFailed) {
+    return `<section>${pageHeading("Your account", "Profile")}
+      <div class="empty-state"><h2>Could not load your account</h2>
+      <p>We could not check your sign-in status just now. Please try again.</p>
+      <button type="button" class="button button-outline" data-profile-retry>Try again</button></div></section>`;
+    }
       if (authState.account) {
     const account = authState.account;
     return `<section>${pageHeading("Your account", "Profile")}
@@ -941,9 +1002,7 @@ function profilePage(authState) {
           <p class="form-message"></p>
         </form>
       </div>
-      ${myPassCard(authState)}
       ${settingsCard(account)}
-      ${privacyCard(authState)}
       <button type="button" class="button button-outline button-full" data-action="logout">Sign out</button></section>`;
   }
   const reg = profileMode === "register";
@@ -984,70 +1043,53 @@ function profilePage(authState) {
       <label class="field-label">Password</label><input name="password" type="password" required>
       ${reg ? "" : `<button type="button" class="password-reset-link" data-action="profile-mode" data-mode="forgot">Forgot password?</button>`}
       ${reg ? `<small>At least 8 characters, with at least 1 number and 1 special character (! @ # $ %). English letters only.</small>` : ""}
-      ${reg ? `<div class="consent-box"><p><a class="me-link" href="privacy.html">Read Privacy Notice</a></p><label class="check-row"><input type="checkbox" name="privacyNoticeAcknowledged" required><span>I acknowledge the Privacy Notice.</span></label></div>` : ""}
+      ${reg ? `<div class="consent-box"><p><a class="me-link" href="privacy.html" target="_blank" rel="noopener" data-privacy-modal>Read Privacy Notice ↗</a></p><label class="check-row"><input type="checkbox" name="privacyNoticeAcknowledged" required><span>I acknowledge the Privacy Notice.</span></label></div>` : ""}
       <button type="submit" class="button button-dark button-full">${reg ? "Create account" : "Sign in"} →</button><p id="account-message" class="form-message">${escapeHtml(authState.notice || authState.error)}</p>
     </form></div></section>`;
 }
 
-async function renderProfilePage(loggedInAccount = null) {
-  const authState = {
-    account: loggedInAccount,
-    config: { registrationEnabled: true },
-    pass: null,
-    passError: false,
-    privacy: null,
-    privacyError: false,
-    notice: "",
-    error: ""
-  };
+async function renderProfilePage() {
+  const authState = { account: null, config: { registrationEnabled: false }, notice: "", error: "", loadFailed: false };
   appContent.innerHTML = `<section>${pageHeading("Your account", "Loading...")}</section>`;
-
-  // 1. If there is no account information sent directly from the login page, then request /api/v1/auth/me
-  if (!authState.account) {
+  try {
+    authState.config = await requestJson("/api/v1/auth/config", { cache: "no-store" });
     try {
       authState.account = await requestJson("/api/v1/auth/me", { cache: "no-store" });
       authState.notice = await clearQrForAccountSwitch(authState.account.accountId);
+      try { authState.avatarUrl = await loadAvatarUrl(); } catch (e) { authState.avatarUrl = ""; }
+      setHeaderAvatar(authState.avatarUrl);
     } catch (e) {
-      // ยังไม่ได้ล็อกอิน (401)
+      // 401 means the visitor is signed out. Any other failure (timeout, 5xx, network) is a
+      // failure to load, not a sign-out, so it must not show the Sign in form.
+      if (!authState.account && e.status !== 401) authState.loadFailed = true;
     }
-  }
+  } catch (e) { authState.loadFailed = true; }
+  if (profileFeedback) { authState.notice = profileFeedback; profileFeedback = ""; }
+  if (currentPage() === "profile") appContent.innerHTML = profilePage(authState);
+}
 
-  // 2. If logged in, fetch the pass (My Pass) and privacy settings to display on the Profile page
-  if (authState.account) {
-    try { authState.avatarUrl = await loadAvatarUrl(); } catch (e) { authState.avatarUrl = ""; }
-    setHeaderAvatar(authState.avatarUrl);
-    const [passResult, privacyResult] = await Promise.allSettled([
-      requestJson("/api/v1/me/pass", { cache: "no-store" }),
-      requestJson("/api/v1/me/privacy-preferences", { cache: "no-store" })
-    ]);
-
-    if (passResult.status === "fulfilled") {
-      authState.pass = passResult.value?.pass || null;
-    } else {
-      authState.passError = true;
-    }
-
-    if (privacyResult.status === "fulfilled") {
-      authState.privacy = privacyResult.value;
-    } else {
-      authState.privacyError = true;
-    }
-  } else {
-    // 3. If not logged in, fetch the config for the login form
-    try {
-      authState.config = await requestJson("/api/v1/auth/config", { cache: "no-store" });
-    } catch (e) {
-      authState.config = { registrationEnabled: true };
-    }
+async function renderPrivacyPreferencesPage() {
+  appContent.innerHTML = `<section>${pageHeading("Your account", "Privacy preferences", "Loading...")}</section>`;
+  let privacy;
+  try {
+    await requestJson("/api/v1/auth/me", { cache: "no-store" });
+    privacy = await requestJson("/api/v1/me/privacy-preferences", { cache: "no-store" });
+  } catch (error) {
+    if (currentPage() !== "privacy-preferences") return;
+    const body = error.status === 401
+      ? `<div class="empty-state"><h2>Sign in required</h2><p>Your session may have expired. Return to Profile to sign in again.</p></div>`
+      : `<div class="empty-state"><h2>Privacy preferences unavailable</h2><p>We could not load your preferences. Your sign-in status has not been changed.</p><button type="button" class="button button-outline" data-privacy-retry>Try again</button></div>`;
+    appContent.innerHTML = `<section>${pageHeading("Your account", "Privacy preferences")}
+      <a class="button button-outline privacy-back-link" href="#profile">← Back to Profile</a>${body}</section>`;
+    return;
   }
-
-  if (profileFeedback) {
-    authState.notice = profileFeedback;
-    profileFeedback = "";
-  }
-  if (currentPage() === "profile") {
-    appContent.innerHTML = profilePage(authState);
-  }
+  if (currentPage() !== "privacy-preferences") return;
+  const notice = profileFeedback;
+  profileFeedback = "";
+  appContent.innerHTML = `<section>${pageHeading("Your account", "Privacy preferences", "Manage optional preferences.")}
+    <a class="button button-outline privacy-back-link" href="#profile">← Back to Profile</a>
+    ${notice ? `<p class="form-message">${escapeHtml(notice)}</p>` : ""}
+    ${privacyPreferencesCard({ privacy, privacyError: false })}</section>`;
 }
 
 document.addEventListener("submit", async (event) => {
@@ -1111,7 +1153,7 @@ function setProfileMode(mode) { profileMode = mode === "register" ? "register" :
 
 async function render() {
   const page = currentPage();
-  const navPage = page === "change-password" ? "profile" : page;
+  const navPage = ["change-password", "privacy-preferences"].includes(page) ? "profile" : page;
   document.querySelectorAll(".bottom-nav [data-page]").forEach(l => l.dataset.page === navPage ? l.setAttribute("aria-current", "page") : l.removeAttribute("aria-current"));
   updateCartCount();
   if (!isCatalogLoaded && (page === "home" || page === "buy")) { appContent.innerHTML = `<div class="loading-panel">Loading...</div>`; await fetchCatalogData(); }
@@ -1121,6 +1163,7 @@ async function render() {
     case "history": void renderHistoryPage(); break;
     case "profile": void renderProfilePage(); break;
     case "change-password": void renderChangePasswordPage(); break;
+    case "privacy-preferences": void renderPrivacyPreferencesPage(); break;
     case "reset": renderResetPage(); break;
     default: appContent.innerHTML = homePage();
   }
