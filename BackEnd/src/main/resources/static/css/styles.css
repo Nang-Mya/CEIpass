@@ -78,7 +78,7 @@ input:focus-visible {
   place-items: center;
   border-radius: 0.72rem;
   background: #1d442d;
-  color: #fff;
+  background-image: url("/icon/pass-icon.svg");
   font-family: Georgia, serif;
   font-size: 1.1rem;
   font-weight: 700;
