@@ -1050,8 +1050,11 @@ attraction-art {
 }
 
 .history-pass-status.is-not-started {
-  background: #fff3d6;
-  color: #805a16;
+  /* background: #fff3d6;
+  color: #805a16; */
+  background: #294a34;
+  /* color: #fdd554; */
+  color: #ffd400
 }
 
 .history-pass-detail {
@@ -2039,7 +2042,7 @@ attraction-art {
 
 .me-status.is-active {
   background: #294a34;
-  color: #fff;
+  color: #94ff00;
 }
 
 .me-subtitle {
