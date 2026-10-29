@@ -7,6 +7,7 @@ public record QrPassResponse(
         UUID accountId,
         UUID userPassId,
         String passName,
+        String holderName,
         Instant expiresAt,
         String qrImageDataUrl,
         String qrPayload

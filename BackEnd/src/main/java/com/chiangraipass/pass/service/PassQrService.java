@@ -71,6 +71,7 @@ public class PassQrService {
                 accountId,
                 activePass.getUserPassId(),
                 activePass.getPass().getDisplayName(),
+                activePass.getHolderName(),
                 expiresAt,
                 qrImageDataUrl,
                 payload

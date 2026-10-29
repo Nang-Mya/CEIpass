@@ -72,6 +72,7 @@ public class OrderService {
             userPass.setAccount(account);
             userPass.setPass(pass);
             userPass.setPayment(payment);
+            userPass.setHolderName(request.holderName().trim());
             userPass.setStartDate(request.startDate());
             userPass.setEndDate(request.endDate());
             userPass.setStatus("ACTIVE");
