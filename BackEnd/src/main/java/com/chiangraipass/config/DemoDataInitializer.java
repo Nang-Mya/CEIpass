@@ -62,6 +62,7 @@ public class DemoDataInitializer {
                 userPass.setAccount(account);
                 userPass.setPass(dayPass);
                 userPass.setPayment(payment);
+                userPass.setHolderName(account.getDisplayName());
                 userPass.setStartDate(LocalDate.now()); // start today
                 userPass.setEndDate(LocalDate.now().plusDays(1)); // end tomorrow
                 userPass.setStatus("ACTIVE"); 
