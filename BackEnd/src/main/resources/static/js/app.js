@@ -1558,3 +1558,165 @@ function touristAttractionsPage() {
     </div>
   </section>`;
 }
+// ==========================================
+// UTILITY FUNCTIONS & STATE
+// ==========================================
+let selectedCategory = "ALL";
+
+function cleanCategory(rawCat) {
+  if (!rawCat) return "ATTRACTION";
+  return rawCat.split(/[·,─-]/)[0].trim().toUpperCase();
+}
+
+// ==========================================
+// POP-UP / MODAL LOGIC (ปักหมุดเดียว + TAG ด้านขวาชื่อ)
+// ==========================================
+function openAttractionModal(index) {
+  const item = attractions[index];
+  if (!item) return;
+
+  const imgPath = item.imageUrl || item.image_url;
+  const name = item.name || item.publicName || "";
+  const location = item.location || "Chiang Rai, Thailand";
+  const categoryShort = cleanCategory(item.category);
+  const desc = item.description || "";
+
+  const specificSearchTerms = {
+    "Wat Rong Khun": "วัดร่องขุ่น เชียงราย",
+    "Wat Rong Khun (White Temple)": "วัดร่องขุ่น เชียงราย",
+    "Baan Dam Museum": "พิพิธภัณฑ์บ้านดำ เชียงราย",
+    "Baan Dam Museum (Black House)": "พิพิธภัณฑ์บ้านดำ เชียงราย",
+    "Singha Park": "สิงห์ปาร์ค เชียงราย",
+    "Singha Park Chiang Rai": "สิงห์ปาร์ค เชียงราย",
+    "Golden Triangle": "สามเหลี่ยมทองคำ เชียงราย",
+    "Choui Fong Tea Plantation": "ไร่ชาฉุยฟง แม่จัน เชียงราย",
+    "Art Bridge Chiang Rai": "ขัวศิลปะ เชียงราย",
+    "Art Bridge Chiang Rai (Khua Silpa)": "ขัวศิลปะ เชียงราย"
+  };
+
+  const searchTerm = specificSearchTerms[name] || (name + " เชียงราย");
+  const mapSearchUrl = `https://maps.google.com/maps?q=${encodeURIComponent(searchTerm)}&hl=th&z=16&output=embed`;
+
+  let modalOverlay = document.getElementById("attractionModalOverlay");
+  if (!modalOverlay) {
+    modalOverlay = document.createElement("div");
+    modalOverlay.id = "attractionModalOverlay";
+    modalOverlay.className = "attraction-modal-overlay";
+    document.body.appendChild(modalOverlay);
+
+    modalOverlay.addEventListener("click", (e) => {
+      if (e.target === modalOverlay) closeAttractionModal();
+    });
+  }
+
+  modalOverlay.innerHTML = `
+    <div class="attraction-modal-card">
+      <button class="modal-close-btn" onclick="window.closeAttractionModal()" aria-label="Close">✕</button>
+      <div class="modal-cover-art">
+        ${imgPath 
+          ? `<img src="${escapeHtml(imgPath)}" alt="${escapeHtml(name)}">`
+          : `<div class="attraction-horizontal-placeholder">${item.initials || 'TR'}</div>`
+        }
+      </div>
+      <div class="modal-body-content">
+        <p class="modal-kicker">${escapeHtml(location)}</p>
+        
+        <div class="modal-title-row">
+          <h2 class="modal-title">${escapeHtml(name)}</h2>
+          <span class="category-tag">${escapeHtml(categoryShort)}</span>
+        </div>
+
+        <p class="modal-desc">${escapeHtml(desc)}</p>
+        
+        <label class="modal-kicker">Location & Map</label>
+        <div class="modal-map-container">
+          <iframe src="${mapSearchUrl}" allowfullscreen="" loading="lazy"></iframe>
+        </div>
+      </div>
+    </div>
+  `;
+
+  requestAnimationFrame(() => modalOverlay.classList.add("active"));
+}
+
+function closeAttractionModal() {
+  const modalOverlay = document.getElementById("attractionModalOverlay");
+  if (modalOverlay) {
+    modalOverlay.classList.remove("active");
+  }
+}
+
+// ==========================================
+// FILTER & RENDER LOGIC
+// ==========================================
+function filterAttractions(cat) {
+  selectedCategory = cat;
+  const content = document.getElementById("attractionsContentList");
+  if (content) {
+    content.innerHTML = renderFilteredList();
+  }
+  document.querySelectorAll(".filter-chip").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.cat === cat);
+  });
+}
+
+function renderFilteredList() {
+  const filtered = selectedCategory === "ALL" 
+    ? attractions 
+    : attractions.filter(a => cleanCategory(a.category) === selectedCategory.toUpperCase());
+
+  return filtered.map((item) => {
+    const realIdx = attractions.indexOf(item);
+    const imgPath = item.imageUrl || item.image_url;
+    
+    const imageHtml = imgPath 
+      ? `<img src="${escapeHtml(imgPath)}" alt="${escapeHtml(item.name || item.publicName)}" class="attraction-horizontal-img" onerror="this.onerror=null; this.parentNode.innerHTML='<div class=\\'attraction-horizontal-placeholder\\'>${item.initials || 'TR'}</div>';">`
+      : `<div class="attraction-horizontal-placeholder">${item.initials || 'TR'}</div>`;
+
+    return `<article class="attraction-horizontal-card" onclick="window.openAttractionModal(${realIdx})" style="cursor: pointer;">
+      <div class="attraction-horizontal-art">
+        ${imageHtml}
+      </div>
+      <div class="attraction-horizontal-info">
+        <p class="card-kicker">${escapeHtml(cleanCategory(item.category))} • ${escapeHtml(item.location || "")}</p>
+        <h3>${escapeHtml(item.name || item.publicName)}</h3>
+        <p>${escapeHtml(item.description)}</p>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+function touristAttractionsPage() {
+  if (typeof catalogLoadError !== "undefined" && catalogLoadError) {
+    return `<section class="home-page">${typeof emptyCatalogState === "function" ? emptyCatalogState() : "<p>Error loading catalog</p>"}</section>`;
+  }
+
+  const categories = ["ALL", ...new Set(attractions.map(a => cleanCategory(a.category)))];
+  
+  const filterButtons = categories.map(cat => 
+    `<button class="filter-chip ${selectedCategory === cat ? 'active' : ''}" data-cat="${cat}" onclick="window.filterAttractions('${cat}')">${cat}</button>`
+  ).join("");
+
+  return `<section class="home-page">
+    <div class="attraction-page-header">
+      <a href="#home" class="back-circle-btn" aria-label="Back to home">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </a>
+      <h1>Tourist Attraction</h1>
+    </div>
+    
+    <div class="attraction-filter-bar">
+      ${filterButtons}
+    </div>
+
+    <div class="attractions-vertical-list" id="attractionsContentList">
+      ${renderFilteredList()}
+    </div>
+  </section>`;
+}
+
+// Bind to window object
+window.openAttractionModal = openAttractionModal;
+window.closeAttractionModal = closeAttractionModal;
+window.filterAttractions = filterAttractions;
+window.touristAttractionsPage = touristAttractionsPage;

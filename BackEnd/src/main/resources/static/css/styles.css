@@ -2733,3 +2733,69 @@ body:has(.privacy-dialog[open]) {
   height: 100%;
   border: 0;
 }
+/* ==========================================
+   CATEGORY CHIPS & FILTER BAR (NO SCROLLBAR)
+   ========================================== */
+.attraction-filter-bar {
+  display: flex;
+  flex-wrap: wrap; /* ขึ้นบรรทัดใหม่ ไม่ต้องมี Scrollbar เลื่อน */
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+  padding: 0;
+}
+
+.filter-chip {
+  padding: 0.35rem 0.85rem;
+  border-radius: 2rem;
+  border: 1px solid #e6e8df;
+  background: #fff;
+  color: #556053;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 140ms ease;
+}
+
+.filter-chip.active, 
+.filter-chip:hover {
+  background: #244b34;
+  color: #fff;
+  border-color: #244b34;
+}
+
+/* ==========================================
+   MODAL TITLE & CATEGORY BADGE DESIGN
+   ========================================== */
+.modal-title-row {
+  display: flex;
+  align-items: baseline; /* จัดวางให้อยู่ระดับเดียวกับชื่อสถานที่ */
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.modal-title {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: 1.45rem;
+  color: #172c20;
+  line-height: 1.25;
+}
+
+/* ดีไซน์ Tag ข้างชื่อสถานที่ (ทรงสี่เหลี่ยมขอบมนมินิมอล) */
+.category-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  background: #f4f6f1;
+  color: #244b34;
+  border: 1px solid #d8e0d5;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
