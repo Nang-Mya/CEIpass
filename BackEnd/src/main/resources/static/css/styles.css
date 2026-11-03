@@ -2738,7 +2738,7 @@ body:has(.privacy-dialog[open]) {
    ========================================== */
 .attraction-filter-bar {
   display: flex;
-  flex-wrap: wrap; /* ขึ้นบรรทัดใหม่ ไม่ต้องมี Scrollbar เลื่อน */
+  flex-wrap: wrap; 
   gap: 0.4rem;
   margin-bottom: 1.25rem;
   padding: 0;
@@ -2769,7 +2769,7 @@ body:has(.privacy-dialog[open]) {
    ========================================== */
 .modal-title-row {
   display: flex;
-  align-items: baseline; /* จัดวางให้อยู่ระดับเดียวกับชื่อสถานที่ */
+  align-items: baseline; 
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.85rem;
@@ -2783,7 +2783,7 @@ body:has(.privacy-dialog[open]) {
   line-height: 1.25;
 }
 
-/* ดีไซน์ Tag ข้างชื่อสถานที่ (ทรงสี่เหลี่ยมขอบมนมินิมอล) */
+
 .category-tag {
   display: inline-flex;
   align-items: center;

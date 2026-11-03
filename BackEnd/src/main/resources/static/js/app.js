@@ -1563,13 +1563,14 @@ function touristAttractionsPage() {
 // ==========================================
 let selectedCategory = "ALL";
 
+
 function cleanCategory(rawCat) {
   if (!rawCat) return "ATTRACTION";
-  return rawCat.split(/[·,─-]/)[0].trim().toUpperCase();
+  return rawCat.split(/[·,─-]/)[0].replace(/_/g, " ").trim().toUpperCase();
 }
 
 // ==========================================
-// POP-UP / MODAL LOGIC (ปักหมุดเดียว + TAG ด้านขวาชื่อ)
+// POP-UP / MODAL LOGIC 
 // ==========================================
 function openAttractionModal(index) {
   const item = attractions[index];
