@@ -2613,3 +2613,123 @@ body:has(.privacy-dialog[open]) {
 .embedded .app-frame {
   padding-bottom: 1.5rem;
 }
+
+/* ==========================================
+   ATTRACTION DETAIL MODAL (POPUP)
+   ========================================== */
+.attraction-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+  padding: 1rem;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 200ms ease, visibility 200ms ease;
+}
+
+.attraction-modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.attraction-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+  transform: translateY(20px);
+  transition: transform 200ms ease;
+}
+
+.attraction-modal-overlay.active .attraction-modal-card {
+  transform: translateY(0);
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  z-index: 10;
+  transition: background 150ms ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.modal-cover-art {
+  width: 100%;
+  height: 220px;
+  background: #eef1e8;
+  overflow: hidden;
+  position: relative;
+}
+
+.modal-cover-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modal-body-content {
+  padding: 1.5rem;
+}
+
+.modal-kicker {
+  color: #7b867a;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 0.35rem;
+  font-weight: 600;
+}
+
+.modal-title {
+  margin: 0 0 0.85rem;
+  font-family: Georgia, serif;
+  font-size: 1.5rem;
+  color: #172c20;
+}
+
+.modal-desc {
+  color: #4a5548;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 1.25rem;
+}
+
+.modal-map-container {
+  width: 100%;
+  height: 180px;
+  border-radius: 0.85rem;
+  overflow: hidden;
+  border: 1px solid #e6e8df;
+  margin-top: 1rem;
+}
+
+.modal-map-container iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}

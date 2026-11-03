@@ -1462,3 +1462,99 @@ window.addEventListener("hashchange", () => {
     });
   }
 });
+// ฟังก์ชันเปิด Modal แสดงข้อมูลสถานที่อย่างละเอียด + แผนที่ Google Maps
+function openAttractionModal(index) {
+  const item = attractions[index];
+  if (!item) return;
+
+  const imgPath = item.imageUrl || item.image_url;
+  const name = item.name || item.publicName || "";
+  const location = item.location || "Chiang Rai, Thailand";
+  const category = item.category || "ATTRACTION";
+  const desc = item.description || "";
+
+  // คำนวณ Query สำหรับสร้าง Google Maps Embed
+  const mapSearchUrl = `https://maps.google.com/maps?q=${encodeURIComponent(name + " " + location)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
+
+  let modalOverlay = document.getElementById("attractionModalOverlay");
+  if (!modalOverlay) {
+    modalOverlay = document.createElement("div");
+    modalOverlay.id = "attractionModalOverlay";
+    modalOverlay.className = "attraction-modal-overlay";
+    document.body.appendChild(modalOverlay);
+
+    // ปิดเมื่อคลิกพื้นหลังสีดำ
+    modalOverlay.addEventListener("click", (e) => {
+      if (e.target === modalOverlay) closeAttractionModal();
+    });
+  }
+
+  modalOverlay.innerHTML = `
+    <div class="attraction-modal-card">
+      <button class="modal-close-btn" onclick="closeAttractionModal()" aria-label="Close">✕</button>
+      <div class="modal-cover-art">
+        ${imgPath 
+          ? `<img src="${escapeHtml(imgPath)}" alt="${escapeHtml(name)}">`
+          : `<div class="attraction-horizontal-placeholder">${item.initials || 'TR'}</div>`
+        }
+      </div>
+      <div class="modal-body-content">
+        <p class="modal-kicker">${escapeHtml(category)} • ${escapeHtml(location)}</p>
+        <h2 class="modal-title">${escapeHtml(name)}</h2>
+        <p class="modal-desc">${escapeHtml(desc)}</p>
+        
+        <label class="modal-kicker">Location & Map</label>
+        <div class="modal-map-container">
+          <iframe src="${mapSearchUrl}" allowfullscreen="" loading="lazy"></iframe>
+        </div>
+      </div>
+    </div>
+  `;
+
+  requestAnimationFrame(() => modalOverlay.classList.add("active"));
+}
+
+function closeAttractionModal() {
+  const modalOverlay = document.getElementById("attractionModalOverlay");
+  if (modalOverlay) {
+    modalOverlay.classList.remove("active");
+  }
+}
+
+// อัปเดตฟังก์ชัน touristAttractionsPage ให้เมื่อกดการ์ดแล้วเรียก openAttractionModal()
+function touristAttractionsPage() {
+  if (catalogLoadError || (isCatalogLoaded && attractions.length === 0)) {
+    return `<section class="home-page">${emptyCatalogState()}</section>`;
+  }
+
+  const verticalList = attractions.map((item, idx) => {
+    const imgPath = item.imageUrl || item.image_url;
+    
+    const imageHtml = imgPath 
+      ? `<img src="${escapeHtml(imgPath)}" alt="${escapeHtml(item.name || item.publicName)}" class="attraction-horizontal-img" onerror="this.onerror=null; this.parentNode.innerHTML='<div class=\\'attraction-horizontal-placeholder\\'>${item.initials || 'TR'}</div>';">`
+      : `<div class="attraction-horizontal-placeholder">${item.initials || 'TR'}</div>`;
+
+    return `<article class="attraction-horizontal-card" onclick="openAttractionModal(${idx})" style="cursor: pointer;">
+      <div class="attraction-horizontal-art">
+        ${imageHtml}
+      </div>
+      <div class="attraction-horizontal-info">
+        <p class="card-kicker">${escapeHtml(item.category || "ATTRACTION")} • ${escapeHtml(item.location || "")}</p>
+        <h3>${escapeHtml(item.name || item.publicName)}</h3>
+        <p>${escapeHtml(item.description)}</p>
+      </div>
+    </article>`;
+  }).join("");
+
+  return `<section class="home-page">
+    <div class="attraction-page-header">
+      <a href="#home" class="back-circle-btn" aria-label="Back to home">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </a>
+      <h1>Tourist Attraction</h1>
+    </div>
+    <div class="attractions-vertical-list">
+      ${verticalList}
+    </div>
+  </section>`;
+}
