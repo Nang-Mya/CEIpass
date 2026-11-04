@@ -1,8 +1,10 @@
 package com.chiangraipass.pass.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDate;
@@ -33,7 +35,7 @@ class PassQrServiceTest {
     private PassQrService passQrService;
 
     @Test
-    void issuesQrForRequestedActivePass() {
+    void issuesStableQrForRequestedActivePass() {
         UUID accountId = UUID.randomUUID();
         UUID firstPassId = UUID.randomUUID();
         UUID requestedPassId = UUID.randomUUID();
@@ -43,10 +45,17 @@ class PassQrServiceTest {
                 .thenReturn(List.of(firstPass, requestedPass));
 
         QrPassResponse response = passQrService.issueQrForAccount(accountId, requestedPassId);
+        QrPassResponse repeatedResponse = passQrService.issueQrForAccount(accountId, requestedPassId);
+        QrPassResponse firstPassResponse = passQrService.issueQrForAccount(accountId, firstPassId);
 
         assertEquals(requestedPassId, response.userPassId());
         assertEquals("Requested pass", response.passName());
+        assertTrue(response.qrPayload().startsWith("CEIPASS:2:"));
+        assertEquals(response.qrPayload(), repeatedResponse.qrPayload());
+        assertEquals(response.qrImageDataUrl(), repeatedResponse.qrImageDataUrl());
+        assertNotEquals(response.qrPayload(), firstPassResponse.qrPayload());
         assertTrue(response.qrImageDataUrl().startsWith("data:image/png;base64,"));
+        verify(userPassRepository).save(requestedPass);
     }
 
     @Test

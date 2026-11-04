@@ -1745,17 +1745,6 @@ attraction-art {
   font-size: 0.68rem;
 }
 
-.qr-expiry {
-  margin: 0.75rem 0;
-  color: #657461;
-  font-size: 0.72rem;
-}
-
-.qr-expiry strong {
-  color: #344d37;
-  font-variant-numeric: tabular-nums;
-}
-
 .qr-safety {
   margin: 0.8rem 0;
   color: #858d83;
@@ -1799,11 +1788,6 @@ attraction-art {
   border: 1px solid #eadfca;
   background: #fbf7ed;
   color: #766541;
-}
-
-.cache-clear-button {
-  display: block;
-  margin: 0.85rem auto;
 }
 
 .text-button {

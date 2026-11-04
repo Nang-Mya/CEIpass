@@ -45,14 +45,14 @@ This is a logical separation, not a requirement to deploy each box as a separate
 
 - Keep the initial route and QR display path small. Defer nonessential screens and assets until after the QR is visible.
 - Render a QR only from a credential issued for the authenticated visitor and relevant pass or transaction.
-- Provide explicit loading, ready, expired, offline, payment-pending, and error states. Distinguish “QR displayed” from “payment confirmed” and “redemption accepted.”
+- Provide explicit loading, ready, pass-expired, offline, payment-pending, and error states. Distinguish “QR displayed” from “payment confirmed” and “redemption accepted.”
 - Cache the app shell and versioned static assets in the service worker. Use IndexedDB only for approved data that has a documented purpose, freshness policy, and invalidation strategy.
 - Exclude payment secrets, authentication tokens where inappropriate, and sensitive personal data from generic cache strategies. Define cache behavior for logout, account switching, expiry, and service-worker upgrades.
-- Measure real-device performance on the critical path. If network issuance is needed to obtain a QR, optimize that request and its rendering; do not silently reuse expired credentials to meet the visual target.
+- Issue one unpredictable, persistent QR credential per pass and cache its image for offline display. Do not rotate or expire the credential on page refresh; pass validity and benefit quotas remain authoritative.
 
 ### Offline redemption constraint
 
-The current product direction allows venues to accept offline QR codes and reconcile later, with temporary duplicate-redemption risk explicitly accepted. Offline access cannot guarantee global one-time redemption across disconnected venues or scanners: two isolated scanners cannot know that the other has already accepted the same code. Preserve offline acceptance records and surface duplicate conflicts for review during synchronization; do not silently overwrite or claim a global one-time guarantee. The scanner trust model, credential lifetime, and synchronization rules still need implementation and validation.
+The visitor app may display a previously saved QR while offline, but venues must be online to validate and record a scan. The current repository does not implement a venue scanner or redemption API. Do not present an offline display as an accepted redemption. If offline scanner acceptance is added later, define its duplicate-use and reconciliation behavior separately.
 
 ## Back-end and API boundaries
 
@@ -84,7 +84,7 @@ The exact acknowledgement timing, retry policy, and response codes should follow
 
 - Use a transactional relational store or another persistence system whose conditional-write and uniqueness guarantees are understood and tested.
 - Model payment and QR lifecycles explicitly. Document legal transitions and enforce them on the server.
-- Redeem a QR through one atomic conditional write: change it from eligible/unredeemed to redeemed only when its identifier matches, it is unexpired, and its current state permits redemption. Treat one affected row as success; zero affected rows means it was expired, invalid, or already used.
+- Keep the QR credential stable for the lifetime of its pass. Each scan must validate pass status and the requested benefit's remaining quota, then record that individual use atomically; the QR itself is not consumed by a scan.
 - Back the redemption condition with a database uniqueness or equivalent invariant where appropriate. Do not use “read, then later write” as the only concurrency safeguard.
 - In the same transaction, persist the successful redemption and its audit record. Define safe behavior for a client retry after a timeout when the first request may already have committed.
 - Enforce uniqueness for provider event IDs and relevant idempotency keys.
@@ -144,8 +144,8 @@ Record the decisions and rationale in pull requests or a lightweight architectur
 - Hosting, deployment environments, API domain, and observability approach.
 - Production database hosting, migration strategy, and the transaction/isolation behavior relied on for conditional redemption.
 - Payment provider(s), signature verification contract, idempotency support, refund flow, and sandbox process.
-- Trusted offline scanner authorization, credential lifetime, and reconciliation design for the accepted temporary duplicate-redemption risk.
-- Pass/QR validity period, renewal behavior, visitor identity model, and privacy/retention requirements.
+- Venue scanner authorization and whether future scanners may validate offline.
+- Pass validity, stable QR credential lifecycle, visitor identity model, and privacy/retention requirements.
 - Partner split formula, rounding, refunds/chargebacks, settlement schedule, and reconciliation owner.
 - Definition of the under-one-second QR metric, percentile, device profiles, and network test conditions.
 
@@ -154,7 +154,7 @@ Record the decisions and rationale in pull requests or a lightweight architectur
 - Concurrently submit multiple redemptions for the same QR and prove exactly one succeeds.
 - Replay the same valid webhook and prove that payment and ledger effects occur once.
 - Test invalid signatures, unknown event IDs, wrong amounts/currencies, delayed events, and provider retries.
-- Test QR expiry boundaries and safe client retries after timeouts.
+- Verify repeated issuance returns the same pass QR, distinct passes receive distinct QR credentials, and expired passes cannot be redeemed.
 - Test PWA startup and approved offline screens after fresh install, reload, cache update, logout, and account change.
 - Measure QR display performance on agreed mobile devices and network profiles.
 - Verify partner allocations, rounding, refunds, and reconciliation against known test cases.

@@ -1,7 +1,9 @@
 package com.chiangraipass.pass.entity;
 
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.HexFormat;
 import java.util.UUID;
 
 import com.chiangraipass.auth.entity.VisitorAccountEntity;
@@ -26,6 +28,8 @@ import jakarta.persistence.Table;
         @Index(name = "IX_user_pass_account_id", columnList = "account_id")
 })
 public class UserPassEntity {
+
+    private static final SecureRandom QR_RANDOM = new SecureRandom();
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -56,6 +60,9 @@ public class UserPassEntity {
     @Column(name = "holder_name", length = 120)
     private String holderName;
 
+    @Column(name = "qr_token", unique = true, length = 64)
+    private String qrToken;
+
     @Column(name = "status", nullable = false, length = 16)
     private String status;
 
@@ -71,6 +78,7 @@ public class UserPassEntity {
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
+        ensureQrToken();
         if (purchaseDatetime == null) {
             purchaseDatetime = now;
         }
@@ -81,6 +89,14 @@ public class UserPassEntity {
             createdAt = now;
         }
         updatedAt = now;
+    }
+
+    public void ensureQrToken() {
+        if (qrToken == null) {
+            byte[] token = new byte[32];
+            QR_RANDOM.nextBytes(token);
+            qrToken = HexFormat.of().formatHex(token);
+        }
     }
 
     @PreUpdate
@@ -150,6 +166,10 @@ public class UserPassEntity {
 
     public void setHolderName(String holderName) {
         this.holderName = holderName;
+    }
+
+    public String getQrToken() {
+        return qrToken;
     }
 
     public String getStatus() {

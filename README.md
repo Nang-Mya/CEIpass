@@ -1,6 +1,6 @@
 # Chiang Rai Pass
 
-Chiang Rai Pass is a planned mobile-first web application for tourists. Its key goals are to display dynamic QR codes quickly, remain useful when connectivity is unstable, process payments reliably, and prevent QR redemption fraud.
+Chiang Rai Pass is a planned mobile-first web application for tourists. Its key goals are to display each pass's unique QR code quickly, remain useful when connectivity is unstable, process payments reliably, and prevent QR redemption fraud.
 
 > **Project status:** The repository contains a mobile-first visitor UI and a Spring Boot backend foundation. Email/password authentication and public catalog endpoints are implemented. OAuth requires provider credentials. The frontend still uses sample catalog/cart data; payment, order history, and venue redemption are not implemented. The backend defaults to an in-memory H2 database, so it is for local development/testing—not persistent production data. The Cloud Run pipeline currently serves only a static frontend preview.
 

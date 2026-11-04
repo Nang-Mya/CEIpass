@@ -107,7 +107,7 @@ document.addEventListener("click", (event) => {
   toggle.setAttribute("aria-label", show ? "Hide password" : "Show password");
   toggle.innerHTML = show ? EYE_OFF_ICON : EYE_ICON;
 });
-let qrRefreshTimer;
+let qrStartsAtTimer;
 let profileFeedback = "";
 
 class ApiError extends Error {
@@ -313,7 +313,6 @@ async function csrfHeaders() {
   // return {};
 }
 
-// keep the QR caching functions as they are, since they are already well-defined and handle IndexedDB operations for caching QR codes.
 function openQrDatabase() {
   return new Promise((resolve, reject) => {
     if (!("indexedDB" in window)) { reject(new Error("No IDB support.")); return; }
@@ -335,12 +334,22 @@ async function clearQrForAccountSwitch(accountId) {
   return "";
 }
 
-function renderQrCard(record, isCached, userPassId) {
+function isPersistentQrRecord(record) {
+  return typeof record?.qrPayload === "string"
+    && record.qrPayload.startsWith("CEIPASS:2:")
+    && Boolean(record.qrImageDataUrl);
+}
+
+function isPassActiveOnDevice(record) {
+  const today = new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return (!record.startDate || record.startDate <= today)
+    && (!record.endDate || record.endDate >= today);
+}
+
+function renderQrCard(record, isCached) {
   const offlineBanner = isCached ? `<div class="offline-banner"><strong>Saved code</strong></div>` : "";
   return `<div class="qr-card">${offlineBanner}<div class="qr-card-heading"><span>Ready to scan</span></div>
-    <img class="qr-image" src="${record.qrImageDataUrl}" alt="QR code for ${escapeHtml(record.passName || "pass")}">
-    <p class="qr-expiry" data-expiry="${escapeHtml(record.expiresAt)}">Expires in <strong>--:--</strong></p>
-    <button type="button" class="button button-outline button-full" data-action="refresh-qr" data-user-pass-id="${escapeHtml(userPassId)}"${isCached ? " disabled" : ""}>Refresh</button></div>`;
+    <img class="qr-image" src="${record.qrImageDataUrl}" alt="QR code for ${escapeHtml(record.passName || "pass")}"></div>`;
 }
 
 function qrPassCardMarkup(pass, record = null, isCached = false, errorMessage = "") {
@@ -349,11 +358,10 @@ function qrPassCardMarkup(pass, record = null, isCached = false, errorMessage = 
     ? "is-active"
     : pass.displayStatus === "EXPIRED" ? "is-expired" : "is-not-started";
   let content = "";
-  if (record && new Date(record.expiresAt).getTime() > Date.now()) {
-    content = renderQrCard(record, isCached, pass.userPassId);
+  if (isPersistentQrRecord(record)) {
+    content = renderQrCard(record, isCached);
   } else if (isActive) {
-    content = `<div class="qr-pass-message">${escapeHtml(errorMessage || "QR code unavailable. Try refreshing.")}</div>
-      <button type="button" class="button button-outline" data-action="refresh-qr" data-user-pass-id="${escapeHtml(pass.userPassId)}">Try again</button>`;
+    content = `<div class="qr-pass-message">${escapeHtml(errorMessage || "QR code unavailable. Connect to the internet to load it.")}</div>`;
   } else if (pass.displayStatus === "EXPIRED") {
     content = `<div class="qr-pass-message">This pass has expired.</div>`;
   } else {
@@ -414,11 +422,11 @@ function renderQrCarousel() {
   viewport.addEventListener("pointercancel", () => {
     qrSwipeStartX = null;
   });
-  startExpiryCountdown();
+  startPassAvailabilityCountdown();
 }
 
 async function renderQrPage() {
-  clearInterval(qrRefreshTimer);
+  clearInterval(qrStartsAtTimer);
   appContent.innerHTML = `<section>${pageHeading("Your visits", "My QR pass", "Loading...")}</section>`;
   let lastAccount = localStorage.getItem(LAST_QR_ACCOUNT_KEY) || "";
   try {
@@ -432,18 +440,40 @@ async function renderQrPage() {
     if (lastAccount && lastAccount !== qrAccountId) await clearCachedQr(lastAccount);
     localStorage.setItem(LAST_QR_ACCOUNT_KEY, qrAccountId);
 
+    let cachedByPassId = new Map();
+    let cacheMessage = "";
+    try {
+      cachedByPassId = new Map((await getCachedQrs(qrAccountId))
+        .filter(isPersistentQrRecord)
+        .filter(isPassActiveOnDevice)
+        .map((record) => [record.userPassId, record]));
+    } catch (cacheError) {
+      cacheMessage = "QR codes are ready, but offline storage is unavailable.";
+    }
+
     const activePasses = qrPassCards.filter((pass) => pass.displayStatus === "ACTIVE");
     const qrResults = await Promise.all(activePasses.map(async (pass) => {
       try {
         const path = `${QR_ENDPOINT}?userPassId=${encodeURIComponent(pass.userPassId)}`;
-        return { userPassId: pass.userPassId, record: await requestJson(path, { cache: "no-store" }) };
+        const record = await requestJson(path, { cache: "no-store" });
+        return {
+          userPassId: pass.userPassId,
+          record: { ...record, startDate: pass.startDate, endDate: pass.endDate }
+        };
       } catch (error) {
-        return { userPassId: pass.userPassId, error: error.message };
+        const cached = cachedByPassId.get(pass.userPassId);
+        return cached
+          ? { userPassId: pass.userPassId, record: cached, isCached: true }
+          : { userPassId: pass.userPassId, error: error.message };
       }
     }));
-    const records = qrResults.filter((result) => result.record).map((result) => result.record);
-    qrRecordsByPassId = new Map(qrResults.map((result) => [result.userPassId, result]));
-    let cacheMessage = "";
+    qrRecordsByPassId = new Map(qrResults.map((result) => [result.userPassId, {
+      record: result.record,
+      isCached: result.isCached || false,
+      error: result.error
+    }]));
+    const records = qrResults.filter((result) => isPersistentQrRecord(result.record))
+      .map((result) => result.record);
     try {
       await saveCachedQrs(qrAccountId, records);
     } catch (cacheError) {
@@ -454,7 +484,7 @@ async function renderQrPage() {
       const carousel = qrPassCards.length
         ? `<div class="qr-carousel"></div>`
         : `<div class="empty-state"><h2>No pass yet</h2><p>Buy a pass to see it here.</p><a class="button button-dark" href="#buy">Explore passes</a></div>`;
-      appContent.innerHTML = `<section class="qr-pass-list">${pageHeading("Your visits", "My QR pass")}${carousel}${cacheMessage ? `<p class="qr-cache-message">${escapeHtml(cacheMessage)}</p>` : ""}<button class="text-button cache-clear-button" data-action="clear-qr-cache">Remove saved QR</button></section>`;
+      appContent.innerHTML = `<section class="qr-pass-list">${pageHeading("Your visits", "My QR pass")}${carousel}${cacheMessage ? `<p class="qr-cache-message">${escapeHtml(cacheMessage)}</p>` : ""}</section>`;
       renderQrCarousel();
     }
   } catch (error) {
@@ -465,9 +495,16 @@ async function renderQrPage() {
       appContent.innerHTML = `<section>${pageHeading("Your visits", "My QR pass")}<div class="empty-state"><h2>Sign in required</h2><a class="button button-dark" href="#profile">Go to profile</a></div></section>`;
       return;
     }
-    if (lastAccount && !navigator.onLine) {
-      const cached = await getCachedQrs(lastAccount);
-      const valid = cached.filter((record) => new Date(record.expiresAt).getTime() > Date.now());
+    let cacheErrorMessage = "";
+    if (lastAccount) {
+      let valid = [];
+      try {
+        valid = (await getCachedQrs(lastAccount))
+          .filter(isPersistentQrRecord)
+          .filter(isPassActiveOnDevice);
+      } catch (cacheError) {
+        cacheErrorMessage = " Saved QR storage could not be read.";
+      }
       if (valid.length) {
         qrPassCards = sortQrPasses(valid.map((record) => ({
           userPassId: record.userPassId,
@@ -479,29 +516,21 @@ async function renderQrPage() {
           record.userPassId,
           { record, isCached: true }
         ]));
-        appContent.innerHTML = `<section class="qr-pass-list">${pageHeading("Your visits", "My QR pass")}<div class="qr-carousel"></div><button class="text-button cache-clear-button" data-action="clear-qr-cache">Remove saved QR</button></section>`;
+        appContent.innerHTML = `<section class="qr-pass-list">${pageHeading("Your visits", "My QR pass")}<div class="qr-carousel"></div></section>`;
         renderQrCarousel();
         return;
       }
     }
-    appContent.innerHTML = `<section>${pageHeading("Your visits", "My QR pass")}<div class="empty-state"><h2>Not available</h2><p>${error.message}</p></div></section>`;
+    appContent.innerHTML = `<section>${pageHeading("Your visits", "My QR pass")}<div class="empty-state"><h2>Not available</h2><p>${error.message}${typeof cacheErrorMessage === "string" ? cacheErrorMessage : ""}</p></div></section>`;
   }
 }
 
-function startExpiryCountdown() {
-  clearInterval(qrRefreshTimer);
-  const expiryElements = [...document.querySelectorAll("[data-expiry]")];
+function startPassAvailabilityCountdown() {
+  clearInterval(qrStartsAtTimer);
   const startElements = [...document.querySelectorAll("[data-starts-at]")];
-  if (!expiryElements.length && !startElements.length) return;
+  if (!startElements.length) return;
   const update = () => {
-    let activeCount = 0;
     let pendingStartCount = 0;
-    expiryElements.forEach((el) => {
-      const s = Math.max(0, Math.floor((new Date(el.dataset.expiry).getTime() - Date.now()) / 1000));
-      el.innerHTML = s > 0 ? `Expires in <strong>${Math.floor(s/60).toString().padStart(2,"0")}:${(s%60).toString().padStart(2,"0")}</strong>` : "<strong>Expired.</strong>";
-      if (s <= 0) el.closest(".qr-card")?.querySelector(".qr-image")?.remove();
-      else activeCount += 1;
-    });
     startElements.forEach((el) => {
       const secondsLeft = Math.max(0, Math.floor((new Date(el.dataset.startsAt).getTime() - Date.now()) / 1000));
       const days = Math.floor(secondsLeft / 86400);
@@ -518,10 +547,10 @@ function startExpiryCountdown() {
         el.textContent = [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
       }
     });
-    if (!activeCount && !pendingStartCount) clearInterval(qrRefreshTimer);
+    if (!pendingStartCount) clearInterval(qrStartsAtTimer);
   };
   update();
-  qrRefreshTimer = setInterval(update, 1000);
+  qrStartsAtTimer = setInterval(update, 1000);
 }
 
 function formatDate(value) {
@@ -1320,46 +1349,6 @@ document.addEventListener("click", async (event) => {
     case "history-recent": await renderHistoryPage(); break;
     case "logout":
       try { const csrf = await csrfHeaders(); await fetch(apiUrl("/api/v1/auth/logout"), { method: "POST", headers: csrf, credentials: "include" }); setHeaderAvatar(""); if (avatarObjectUrl) { URL.revokeObjectURL(avatarObjectUrl); avatarObjectUrl = ""; } try { await clearAllCachedQr(); localStorage.removeItem(LAST_QR_ACCOUNT_KEY); } catch (e) {} profileMode = "login"; profileFeedback = "Signed out."; render(); } catch (e) {} break;
-    case "refresh-qr":
-      if (!control.disabled) {
-        control.disabled = true;
-        try {
-          const userPassId = control.dataset.userPassId;
-          const path = `${QR_ENDPOINT}?userPassId=${encodeURIComponent(userPassId)}`;
-          const record = await requestJson(path, { cache: "no-store" });
-          const pass = qrPassCards.find((item) => item.userPassId === userPassId);
-          if (pass) {
-            qrRecordsByPassId.set(userPassId, { userPassId, record });
-            renderQrCarousel();
-          }
-          try {
-            const cached = await getCachedQrs(record.accountId);
-            await saveCachedQrs(record.accountId, [
-              ...cached.filter((item) => item.userPassId !== record.userPassId),
-              record
-            ]);
-          } catch (cacheError) {
-            const message = document.createElement("p");
-            message.className = "qr-cache-message";
-            message.textContent = "QR updated, but could not be saved for offline use.";
-            appContent.querySelector(".qr-pass-list")?.append(message);
-          }
-        } catch (error) {
-          qrRecordsByPassId.set(control.dataset.userPassId, { error: error.message });
-          renderQrCarousel();
-        }
-      }
-      break;
-    case "clear-qr-cache": {
-      const acc = localStorage.getItem(LAST_QR_ACCOUNT_KEY);
-      if (acc) await clearCachedQr(acc);
-      control.remove();
-      const message = document.createElement("p");
-      message.className = "qr-cache-message";
-      message.textContent = "Saved QR codes removed from this device.";
-      appContent.querySelector(".qr-pass-list")?.append(message);
-      break;
-    }
     case "close-dialog": control.closest("dialog")?.close(); break;
     case "close-pass-dialog": {
       const dialog = control.closest("dialog");

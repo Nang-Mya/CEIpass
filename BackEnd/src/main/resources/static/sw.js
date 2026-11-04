@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "chiang-rai-pass-shell-v6";
+const CACHE_NAME = "chiang-rai-pass-shell-v8";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -50,7 +50,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
+    caches.match(request, { ignoreSearch: true }).then((cached) => {
       if (cached) return cached;
       return fetch(request).then((response) => {
         if (response.ok) {

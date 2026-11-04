@@ -8,7 +8,7 @@ This feature adds the five requested mobile-first screens and navigable bottom b
 |---|---|---|
 | Home | Quick links to passes and QR; clearly marked sample partner-attraction cards. | Published partner catalog records, current pass eligibility, approved imagery, and accurate accessibility/location details. |
 | Buy | Clearly marked sample passes, add/remove quantity, locally persisted demo cart, subtotal, and a safe checkout explanation. | Published pass records, server-owned cart/order, inventory/eligibility, payment-provider checkout, and order status. |
-| My QR | QR API loading/error states; short-lived QR caching/display support; expiry countdown; offline-risk warning and local cache removal. | Authentication, pass eligibility, unpredictable short-lived QR issuance/rotation, scanner validation, and server-side single-use redemption. |
+| My QR | Stable per-pass QR display; account-scoped offline caching; pass validity states. | Authentication and pass eligibility are implemented. Venue scanner validation and per-benefit usage recording remain unimplemented. |
 | History | Loading, empty, and unavailable states; renders a validated history response. | Authenticated, paginated, server-owned usage records and retention/privacy rules. |
 | Profile | Email/password account creation and session sign-in; optional Google/Apple OAuth; current account display and sign-out; published-notice acknowledgement before registration. | Provider credentials/callback setup, email verification and recovery, rate limiting, privacy rights, and authoritative consent-management APIs. |
 
@@ -24,18 +24,17 @@ The backend provides JPA-backed public catalog endpoints and server-side session
 
 ## Offline model and duplicate-scan risk
 
-The service worker caches only the visitor app shell and static assets. It does not cache API responses. Increment the app-shell cache version (`CACHE_NAME` in `FrontEnd/sw.js`) when deploying changed cached assets so returning installations refresh the shell. A QR credential returned by the future authenticated QR endpoint is kept separately in IndexedDB, keyed by an opaque account identifier; the visitor can remove that cached record on this device.
+The service worker caches only the visitor app shell and static assets. It does not cache API responses. Increment the app-shell cache version (`CACHE_NAME` in `BackEnd/src/main/resources/static/sw.js`) when deploying changed cached assets so returning installations refresh the shell. A QR credential returned by the authenticated QR endpoint is kept separately in IndexedDB, keyed by an opaque account identifier; the visitor can remove that cached record on this device.
 
-The user has chosen to allow venues to accept offline QR codes and reconcile later, accepting temporary duplicate-redemption risk. That policy **cannot provide a global one-time guarantee while scanners are disconnected**. Two offline scanners may both accept the same credential before either synchronizes. The offline screen must disclose this limitation; venue workflows must record offline acceptance and later synchronization must flag duplicate attempts for review rather than silently overwriting one record.
+The visitor app can display a saved QR while offline, but the partner scanner must be online to validate the pass and record a use. Displaying a cached QR does not mean a redemption was accepted. This repository does not yet implement the scanner or redemption API.
 
 The web platform cannot reliably block screenshots. A screenshot may be copied to another device or shown later. Mitigations belong in credential design and scanner validation:
 
-- Use a cryptographically unpredictable, short-lived, account/pass-bound credential. Never encode personal information or payment secrets in the QR.
-- Display only the QR payload issued by the backend; rotate or expire it according to the approved product policy.
-- Validate payment/pass eligibility, expiry, and redemption state at the scanner.
-- When online, redeem with an atomic conditional database update so only one request wins.
-- When offline, bind every accepted event to a venue/scanner and local sequence, timestamp it, and synchronize idempotently. Preserve evidence of conflicting use for investigation. Do not promise duplicate prevention before synchronization.
-- Set and communicate a concrete offline credential lifetime and clock-tolerance policy before issuing production credentials.
+- Use a cryptographically unpredictable, stable, per-pass credential. Never encode personal information or payment secrets in the QR.
+- Display the QR payload issued by the backend; do not rotate it on refresh or impose a rolling QR expiry. Pass status and benefit quotas still govern acceptance.
+- Validate pass eligibility and the requested benefit's remaining quota at the scanner.
+- Record each permitted use atomically and idempotently; scanning does not consume or invalidate the pass's QR credential.
+- Require connectivity for scanner validation until an offline redemption design is explicitly approved and implemented.
 
 ## Frontend API contract expected
 
@@ -57,8 +56,8 @@ Catalog endpoints below are implemented. Other endpoints remain proposed contrac
 
 ### QR issuance and history
 
-- `GET /api/v1/me/qr` requires authentication and returns a JSON object with `accountId` (opaque, non-PII cache key), `passName`, `expiresAt` (ISO-8601), and `qrImageDataUrl` (PNG data URL containing the opaque signed credential). A production API may instead return a dedicated QR payload field rendered by a maintained QR library; never let the browser construct authorization tokens.
-- The frontend accepts cached QR data only for its previously active account, checks expiry locally for display, and sends no cached credential to another account. Expiry displayed in the browser is a usability hint, not a security control.
+- `GET /api/v1/me/qr` requires authentication and returns `accountId` (opaque, non-PII cache key), `userPassId`, `passName`, `qrImageDataUrl`, and the stable opaque `qrPayload`. It does not return a rolling `expiresAt`; never let the browser construct QR credentials.
+- The frontend accepts cached QR data only for its previously active account, uses it for offline display, and sends no cached credential to another account. The scanner remains responsible for validating current pass status and benefit quota.
 - `GET /api/v1/me/usage-history` requires authentication and returns paginated entries containing `attractionName`, `passName`, and `usedAt` (ISO-8601), plus stable entry IDs for future pagination.
 - Actual scanner redemption uses a separate authenticated venue API, for example `POST /api/v1/venue/redemptions`, with the credential and an idempotency key. Venue authentication/authorization must be distinct from visitor authentication. Online processing must be atomic. Offline synchronization must preserve the original event and detect conflicts.
 
@@ -80,7 +79,7 @@ The operator must publish and review the privacy notice and configure its URL/ve
 - Navigate through all five destinations using the bottom bar and Home quick links; confirm active navigation and keyboard focus are clear.
 - Add, remove, and reload pass quantities; ensure the cart persists only as sample data on that browser and enforces its quantity cap.
 - Verify checkout states clearly that no order/payment was created until an API exists.
-- Verify the QR screen's pending, service-unavailable, offline-without-cache, cached/unexpired, expired, and clear-cache states. A cached image must not be displayed past expiry.
+- Verify the QR screen's pending, service-unavailable, offline-without-cache, cached, expired-pass, and clear-cache states. Repeated issuance and reload must preserve each pass's QR payload; different passes must have distinct payloads.
 - Verify the service worker serves the app shell offline and does not cache `/api/` or cross-origin responses.
 - Verify History handles loading, empty, malformed, and API failure responses without fabricating records.
 - Verify email registration and login establish real server-side sessions, login/logout require CSRF tokens, and account configuration keeps registration disabled without an explicitly enabled, published privacy notice.
