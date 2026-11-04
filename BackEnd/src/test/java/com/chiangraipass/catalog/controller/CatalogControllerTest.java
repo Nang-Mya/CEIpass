@@ -69,13 +69,15 @@ class CatalogControllerTest {
                         "Museum",
                         null,
                         null,
-                        true)));
+                        true,
+                        "https://maps.example/partner-1")));
 
         mockMvc.perform(get("/api/v1/catalog/attractions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].partnerId").value("partner-1"))
                 .andExpect(jsonPath("$[0].name").value("Published Partner"))
                 .andExpect(jsonPath("$[0].description").value("A local museum"))
-                .andExpect(jsonPath("$[0].eligibleForPass").value(true));
+                .andExpect(jsonPath("$[0].eligibleForPass").value(true))
+                .andExpect(jsonPath("$[0].mapUrl").value("https://maps.example/partner-1"));
     }
 }

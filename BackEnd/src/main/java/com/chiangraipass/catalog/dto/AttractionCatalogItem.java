@@ -8,5 +8,6 @@ public record AttractionCatalogItem(
         String category,
         String imageUrl,
         String accessibilityInformation,
-        boolean eligibleForPass) {
+        boolean eligibleForPass,
+        String mapUrl) {
 }
