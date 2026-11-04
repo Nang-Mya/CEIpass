@@ -247,9 +247,9 @@ function homePage() {
   </div></div>
     <section class="section-block quick-actions" aria-label="Quick access">
       <a class="quick-card" href="#qr">
-        <span class="quick-icon quick-icon-amber" aria-hidden="true">
+        <span class="quick-icon quick-icon-green" aria-hidden="true">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="1" y="2" width="21" height="21" rx="1.8"></rect>
+            <rect x="1" y="2" width="21" height="21" rx="3.5"></rect>
             <path d="M5 6 h5 v5 H5 z
                     m8 0   h5 v5 H14 z
                     M5 14  h5 v5 H5 z
