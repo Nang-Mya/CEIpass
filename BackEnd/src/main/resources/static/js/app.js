@@ -1189,10 +1189,13 @@ async function render() {
   }
 }
 
-function showNotice(title, message) {
+function showNotice(title, message, actionLabel = "", action = "") {
   document.querySelector("#notice-dialog")?.remove();
   const d = document.createElement("dialog"); d.id = "notice-dialog"; d.className = "notice-dialog";
-  d.innerHTML = `<div class="dialog-content"><button class="dialog-close" data-action="close-dialog">×</button><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p><button class="button button-dark" data-action="close-dialog">Got it</button></div>`;
+  const actionButton = actionLabel && action
+    ? `<button class="button button-dark" data-action="${escapeHtml(action)}">${escapeHtml(actionLabel)}</button>`
+    : `<button class="button button-dark" data-action="close-dialog">Got it</button>`;
+  d.innerHTML = `<div class="dialog-content"><button class="dialog-close" data-action="close-dialog">×</button><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p>${actionButton}</div>`;
   document.body.append(d); d.showModal();
 }
 
@@ -1333,6 +1336,10 @@ document.addEventListener("click", async (event) => {
         render();
       } catch (e) {
         render();
+        if (e.status === 401 && completedCount === 0) {
+          showNotice("Sign in required", "Sign in to continue to checkout.", "Go to sign in", "checkout-login");
+          break;
+        }
         const title = completedCount ? "Checkout incomplete" : "Checkout failed";
         const message = completedCount
           ? `${completedCount} pass${completedCount === 1 ? " was" : "es were"} checked out. Completed items were removed from your cart; review the remaining items before trying again. ${e.message}`
@@ -1341,6 +1348,13 @@ document.addEventListener("click", async (event) => {
       }
       break;
     case "profile-mode": setProfileMode(control.dataset.mode); break;
+    case "checkout-login":
+      control.closest("dialog")?.remove();
+      profileMode = "login";
+      profileFeedback = "Sign in to continue to checkout.";
+      if (currentPage() === "profile") render();
+      else window.location.hash = "profile";
+      break;
     case "history-full":
       event.preventDefault();
       historyExpandedPassIds.add(control.dataset.userPassId);
