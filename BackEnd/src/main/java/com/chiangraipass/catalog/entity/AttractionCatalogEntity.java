@@ -31,6 +31,9 @@ public class AttractionCatalogEntity {
     @Column(name = "image_url", length = 2048)
     private String imageUrl;
 
+    @Column(name = "map_url", length = 2048)
+    private String mapUrl;
+
     @Column(name = "accessibility_information", length = 1000)
     private String accessibilityInformation;
 
@@ -61,7 +64,8 @@ public class AttractionCatalogEntity {
                 category,
                 imageUrl,
                 accessibilityInformation,
-                passEligible);
+                passEligible,
+                mapUrl);
     }
 
     public String getPartnerId() {
@@ -110,6 +114,14 @@ public class AttractionCatalogEntity {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public String getMapUrl() {
+        return mapUrl;
+    }
+
+    public void setMapUrl(String mapUrl) {
+        this.mapUrl = mapUrl;
     }
 
     public String getAccessibilityInformation() {
