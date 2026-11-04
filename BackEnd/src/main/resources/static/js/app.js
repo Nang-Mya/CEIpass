@@ -242,12 +242,25 @@ function homePage() {
   return `<section class="home-page">
     <div class="hero-card"><div class="hero-copy"><p class="eyebrow eyebrow-light">Your Chiang Rai adventure</p><h1>See more.<br>Worry less.</h1>
     <span></span>
-    <a class="button button-light" href="#buy">Explore passes <span aria-hidden="true">→</span></a></div></div>
+    <a class="button button-light-explore" href="#buy">Explore passes<span aria-hidden="true">→</span></a>
+    <!-- <a class="button button-light-qr" href="#qr">My QR<span aria-hidden="true">→</span></a> -->
+  </div></div>
     <section class="section-block quick-actions" aria-label="Quick access">
-      <a class="quick-card" href="#qr"><span class="quick-icon quick-icon-amber" aria-hidden="true">📱</span><span><strong>My QR pass</strong><small>Ready when you are</small></span></a>
+      <a class="quick-card" href="#qr">
+        <span class="quick-icon quick-icon-amber" aria-hidden="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="1" y="2" width="21" height="21" rx="1.8"></rect>
+            <path d="M5 6 h5 v5 H5 z
+                    m8 0   h5 v5 H14 z
+                    M5 14  h5 v5 H5 z
+                    m8 0   h5 v5 H13 z">
+            </path>
+          </svg>
+        </span>
+        <span><strong>My QR pass</strong><small>Check your pass QR here</small></span>
+      </a>
     </section>
     <section class="section-block">
-      <!-- ปุ่ม > ลิงก์ไปยัง #attractions -->
       <div class="section-title-row-link">
         <div><p class="eyebrow">Hand-picked for you</p><h2>Explore Chiang Rai</h2></div>
         <a href="#attractions" class="explore-link-btn" aria-label="See all tourist attractions">

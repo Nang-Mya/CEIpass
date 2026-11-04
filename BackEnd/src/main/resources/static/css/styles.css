@@ -219,11 +219,18 @@ input:focus-visible {
   transform: translateY(-1px);
 }
 
-.button-light {
-  /* margin-inline: 0.25rem 0.25rem; */
+.button-light-explore {
+  margin-inline: 0.25rem 0.25rem;
   margin-block: 5rem 0.25rem;
   background: #f4f1e7;
   color: #203c2b;
+}
+
+.button-light-qr {
+  margin-inline: 0.25rem 0.25rem;
+  margin-block: 10rem 0.25rem;
+  background: #f4f1e7bb;
+  color: #000000;
 }
 
 .button-light:hover {
