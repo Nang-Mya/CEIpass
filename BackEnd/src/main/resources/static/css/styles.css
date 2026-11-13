@@ -588,19 +588,27 @@ input:focus-visible {
 
 .attraction-image {
   width: 100%;
+  max-width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center; 
+  object-position: center;
   display: block;
 }
 
-attraction-art {
+.attraction-art {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 10; 
-  min-height: 0;         
+  aspect-ratio: 16 / 10;
+  min-height: 0;
   overflow: hidden;
   background: transparent;
+}
+
+.attraction-art > .attraction-image-fallback {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
 }
 
 .attraction-art.rose {
@@ -2046,10 +2054,6 @@ attraction-art {
     grid-template-columns: 1fr;
   }
 
-  .attraction-art {
-    min-height: 8rem;
-  }
-
   .attraction-info {
     padding: 0.85rem;
   }
@@ -2459,14 +2463,17 @@ attraction-art {
 .attraction-horizontal-art {
   position: relative;
   width: 100%;
-  height: 100%;
-  min-height: 7.5rem;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  min-height: 0;
+  align-self: start;
   overflow: hidden;
   background: #eef1e8;
 }
 
 .attraction-horizontal-img {
   width: 100%;
+  max-width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center;
