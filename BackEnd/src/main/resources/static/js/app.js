@@ -1891,3 +1891,10 @@ window.openAttractionModal = openAttractionModal;
 window.closeAttractionModal = closeAttractionModal;
 window.filterAttractions = filterAttractions;
 window.touristAttractionsPage = touristAttractionsPage;
+
+// register Service Worker for use website while Offline (PWA App Shell)
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
