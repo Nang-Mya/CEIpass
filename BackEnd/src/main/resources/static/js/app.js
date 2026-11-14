@@ -241,8 +241,8 @@ function emptyCatalogState() {
 
 function attractionCard(attraction, compact = false, itemIndex = -1) {
   const imageHtml = attraction.imageUrl 
-    ? `<img src="${escapeHtml(attraction.imageUrl)}" alt="${escapeHtml(attraction.name)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit;">`
-    : `<span>${attraction.initials}</span>`; 
+    ? `<img class="attraction-image" src="${escapeHtml(attraction.imageUrl)}" alt="${escapeHtml(attraction.name)}">`
+    : `<span>${attraction.initials}</span>`;
     // if don't have img it'll show short name instead of blank space
   const interactionAttributes = itemIndex >= 0
     ? ` role="button" tabindex="0" onclick="window.openAttractionModal(${itemIndex})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.openAttractionModal(${itemIndex});}"`
