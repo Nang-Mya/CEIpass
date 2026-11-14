@@ -15,6 +15,9 @@ let passes = [];
 let attractions = [];
 let isCatalogLoaded = false;
 let catalogLoadError = false;
+let homeSelections = null;
+let homeSearchQuery = "";
+let homeSearchTimeout = null;
 let historyExpandedPassIds = new Set();
 let historyPassCards = [];
 let historyHasInitializedCards = false;
@@ -107,6 +110,20 @@ document.addEventListener("click", (event) => {
   toggle.setAttribute("aria-label", show ? "Hide password" : "Show password");
   toggle.innerHTML = show ? EYE_OFF_ICON : EYE_ICON;
 });
+
+document.addEventListener("input", (event) => {
+  if (event.target.id !== "home-catalog-search") return;
+  clearTimeout(homeSearchTimeout);
+  homeSearchTimeout = setTimeout(updateHomeSearchResults, 200);
+});
+
+document.addEventListener("submit", (event) => {
+  if (event.target.id !== "home-catalog-search-form") return;
+  event.preventDefault();
+  clearTimeout(homeSearchTimeout);
+  updateHomeSearchResults();
+});
+
 let qrStartsAtTimer;
 let profileFeedback = "";
 
@@ -211,7 +228,7 @@ function updateCartCount() {
 function announce(message) { announcer.textContent = message; }
 function currentPage() {
   const page = window.location.hash.slice(1).split("?")[0];
-  return ["home", "buy", "qr", "history", "profile", "change-password", "privacy-preferences", "reset"].includes(page) ? page : "home";
+  return ["home", "buy", "qr", "history", "profile", "change-password", "privacy-preferences", "reset", "restaurants", "hotels"].includes(page) ? page : "home";
 }
 
 function pageHeading(eyebrow, title, description = "") {
@@ -222,13 +239,16 @@ function emptyCatalogState() {
   return `<div class="empty-state"><span class="empty-icon" aria-hidden="true">📡</span><h2>Catalog is unavailable</h2><p>Check backend API and Database.</p><button type="button" class="button button-outline" onclick="location.reload()">Retry Connection</button></div>`;
 }
 
-function attractionCard(attraction, compact = false) {
+function attractionCard(attraction, compact = false, itemIndex = -1) {
   const imageHtml = attraction.imageUrl 
     ? `<img src="${escapeHtml(attraction.imageUrl)}" alt="${escapeHtml(attraction.name)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: inherit;">`
     : `<span>${attraction.initials}</span>`; 
     // if don't have img it'll show short name instead of blank space
+  const interactionAttributes = itemIndex >= 0
+    ? ` role="button" tabindex="0" onclick="window.openAttractionModal(${itemIndex})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.openAttractionModal(${itemIndex});}"`
+    : "";
 
-  return `<article class="attraction-card${compact ? " attraction-card-compact" : ""}">
+  return `<article class="attraction-card${compact ? " attraction-card-compact" : ""}"${interactionAttributes}>
     <div class="attraction-art ${attraction.tone}" aria-hidden="true">
       ${imageHtml}
     </div>
@@ -236,9 +256,78 @@ function attractionCard(attraction, compact = false) {
     ${compact ? "" : `<p>${escapeHtml(attraction.description)}</p>`}<span class="partner-label"><span class="partner-dot"></span>Pass partner</span></div></article>`;
 }
 
+function pickRandomPlaces(group) {
+  const places = attractions.filter((place) => getCategoryGroup(place.category) === group);
+  for (let index = places.length - 1; index > 0; index--) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [places[index], places[swapIndex]] = [places[swapIndex], places[index]];
+  }
+  return places.slice(0, 3);
+}
+
+function renderHomeGroup(group, title, route, matchingPlaces) {
+  const places = matchingPlaces || homeSelections[group];
+  if (places.length === 0) return "";
+  const cards = places.map((place) => attractionCard(place, true, attractions.indexOf(place))).join("");
+
+  return `<section class="section-block home-category-section">
+    <div class="section-title-row-link">
+      <h2>${title}</h2>
+      <a href="#${route}" class="explore-link-btn" aria-label="See all ${title.toLowerCase()}">
+        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </a>
+    </div>
+    <div class="attraction-list home-category-list">${cards}</div>
+  </section>`;
+}
+
+function renderHomeCatalogSections(query = "") {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  if (!normalizedQuery) {
+    return [
+      renderHomeGroup("attractions", "Attraction", "attractions"),
+      renderHomeGroup("restaurants", "Restaurant", "restaurants"),
+      renderHomeGroup("hotels", "Hotel", "hotels")
+    ].join("");
+  }
+
+  const matches = attractions.filter((place) => {
+    const searchableText = [
+      place.publicName || place.name,
+      cleanCategory(place.category),
+      place.location,
+      place.description
+    ].filter(Boolean).join(" ").toLocaleLowerCase();
+    return searchableText.includes(normalizedQuery);
+  });
+  if (matches.length === 0) return `<p class="home-search-empty">No results found</p>`;
+
+  return [
+    ["attractions", "Attraction", "attractions"],
+    ["restaurants", "Restaurant", "restaurants"],
+    ["hotels", "Hotel", "hotels"]
+  ].map(([group, title, route]) =>
+    renderHomeGroup(group, title, route, matches.filter((place) => getCategoryGroup(place.category) === group))
+  ).join("");
+}
+
+function updateHomeSearchResults() {
+  const input = document.querySelector("#home-catalog-search");
+  const results = document.querySelector("#home-catalog-sections");
+  if (!input || !results) return;
+  homeSearchQuery = input.value;
+  results.innerHTML = renderHomeCatalogSections(homeSearchQuery);
+}
+
 function homePage() {
   if (catalogLoadError || (isCatalogLoaded && attractions.length === 0)) return `<section class="home-page">${emptyCatalogState()}</section>`;
-  const featured = attractions.slice(0, 3).map((attr) => attractionCard(attr, true)).join("");
+  if (!homeSelections) {
+    homeSelections = {
+      attractions: pickRandomPlaces("attractions"),
+      restaurants: pickRandomPlaces("restaurants"),
+      hotels: pickRandomPlaces("hotels")
+    };
+  }
   return `<section class="home-page">
     <div class="hero-card"><div class="hero-copy"><p class="eyebrow eyebrow-light">Your Chiang Rai adventure</p><h1>See more.<br>Worry less.</h1>
     <span></span>
@@ -263,12 +352,15 @@ function homePage() {
     <section class="section-block">
       <div class="section-title-row-link">
         <div><p class="eyebrow">Hand-picked for you</p><h2>Explore Chiang Rai</h2></div>
-        <a href="#attractions" class="explore-link-btn" aria-label="See all tourist attractions">
-          <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </a>
       </div>
-      <div class="attraction-list">${featured}</div>
     </section>
+    <form class="home-search" id="home-catalog-search-form" role="search">
+      <input id="home-catalog-search" type="search" value="${escapeHtml(homeSearchQuery)}" placeholder="Search attractions, restaurants, hotels" aria-label="Search attractions, restaurants, hotels">
+      <button type="submit" aria-label="Search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 5 5"></path></svg>
+      </button>
+    </form>
+    <div id="home-catalog-sections">${renderHomeCatalogSections(homeSearchQuery)}</div>
   </section>`;
 }
 
@@ -1186,12 +1278,16 @@ function setProfileMode(mode) { profileMode = mode === "register" ? "register" :
 
 async function render() {
   const page = currentPage();
-  const navPage = ["change-password", "privacy-preferences"].includes(page) ? "profile" : page;
+  const navPage = ["change-password", "privacy-preferences"].includes(page)
+    ? "profile"
+    : ["restaurants", "hotels"].includes(page) ? "home" : page;
   document.querySelectorAll(".bottom-nav [data-page]").forEach(l => l.dataset.page === navPage ? l.setAttribute("aria-current", "page") : l.removeAttribute("aria-current"));
   updateCartCount();
-  if (!isCatalogLoaded && (page === "home" || page === "buy")) { appContent.innerHTML = `<div class="loading-panel">Loading...</div>`; await fetchCatalogData(); }
+  if (!isCatalogLoaded && ["home", "buy", "restaurants", "hotels"].includes(page)) { appContent.innerHTML = `<div class="loading-panel">Loading...</div>`; await fetchCatalogData(); }
   switch (page) {
     case "buy": appContent.innerHTML = buyPage(); break;
+    case "restaurants": appContent.innerHTML = groupedCatalogPage("restaurants", "Restaurants"); break;
+    case "hotels": appContent.innerHTML = groupedCatalogPage("hotels", "Hotels"); break;
     case "qr": void renderQrPage(); break;
     case "history": void renderHistoryPage(); break;
     case "profile": void renderProfilePage(); break;
@@ -1426,7 +1522,14 @@ document.addEventListener("submit", async (event) => {
   } catch (e) { msg.textContent = e.message; } finally { btn.disabled = false; }
 });
 
-window.addEventListener("hashchange", render);
+window.addEventListener("hashchange", () => {
+  if (window.location.hash.slice(1).split("?")[0] !== "home") {
+    homeSelections = null;
+    homeSearchQuery = "";
+    clearTimeout(homeSearchTimeout);
+  }
+  render();
+});
 if (currentPage() !== "profile") void syncHeaderAvatar();
 render();
 
@@ -1585,6 +1688,13 @@ function cleanCategory(rawCat) {
   return rawCat.split(/[·,─-]/)[0].replace(/_/g, " ").trim().toUpperCase();
 }
 
+function getCategoryGroup(category) {
+  const normalizedCategory = cleanCategory(category);
+  if (normalizedCategory === "RESTAURANT") return "restaurants";
+  if (normalizedCategory === "HOTEL") return "hotels";
+  return "attractions";
+}
+
 // ==========================================
 // POP-UP / MODAL LOGIC 
 // ==========================================
@@ -1597,6 +1707,7 @@ function openAttractionModal(index) {
   const location = item.location || "Chiang Rai, Thailand";
   const categoryShort = cleanCategory(item.category);
   const desc = item.description || "";
+  const accessibilityInformation = item.accessibilityInformation || "";
 
   const specificSearchTerms = {
     "Wat Rong Khun": "วัดร่องขุ่น เชียงราย",
@@ -1613,6 +1724,23 @@ function openAttractionModal(index) {
 
   const searchTerm = specificSearchTerms[name] || (name + " เชียงราย");
   const mapSearchUrl = `https://maps.google.com/maps?q=${encodeURIComponent(searchTerm)}&hl=th&z=16&output=embed`;
+  const isAttraction = getCategoryGroup(item.category) === "attractions";
+  const restaurantHotelMap = !isAttraction
+    ? (() => {
+        const coordinates = item.mapUrl
+          ? item.mapUrl.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/)
+          : null;
+        const embedQuery = coordinates
+          ? `${coordinates[1]},${coordinates[2]}`
+          : `${name} Chiang Rai`;
+        const embedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(embedQuery)}&hl=th&z=16&output=embed`;
+        const mapsUrl = item.mapUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(embedQuery)}`;
+        return `<div class="modal-map-container modal-map-container-with-button">
+                  <a class="button button-outline modal-map-overlay-button" href="${escapeHtml(mapsUrl)}" target="_blank" rel="noopener">Maps</a>
+                  <iframe src="${embedUrl}" allowfullscreen="" loading="lazy"></iframe>
+                </div>`;
+      })()
+    : "";
 
   let modalOverlay = document.getElementById("attractionModalOverlay");
   if (!modalOverlay) {
@@ -1644,11 +1772,16 @@ function openAttractionModal(index) {
         </div>
 
         <p class="modal-desc">${escapeHtml(desc)}</p>
+        ${getCategoryGroup(item.category) !== "attractions" && accessibilityInformation
+          ? `<p class="modal-accessibility"><strong>Accessibility</strong><br>${escapeHtml(accessibilityInformation)}</p>`
+          : ""}
         
         <label class="modal-kicker">Location & Map</label>
-        <div class="modal-map-container">
-          <iframe src="${mapSearchUrl}" allowfullscreen="" loading="lazy"></iframe>
-        </div>
+        ${isAttraction
+          ? `<div class="modal-map-container">
+              <iframe src="${mapSearchUrl}" allowfullscreen="" loading="lazy"></iframe>
+            </div>`
+          : restaurantHotelMap}
       </div>
     </div>
   `;
@@ -1677,10 +1810,11 @@ function filterAttractions(cat) {
   });
 }
 
-function renderFilteredList() {
-  const filtered = selectedCategory === "ALL" 
-    ? attractions 
-    : attractions.filter(a => cleanCategory(a.category) === selectedCategory.toUpperCase());
+function renderFilteredList(group = "attractions") {
+  const groupItems = attractions.filter((attraction) => getCategoryGroup(attraction.category) === group);
+  const filtered = group !== "attractions" || selectedCategory === "ALL"
+    ? groupItems
+    : groupItems.filter((attraction) => cleanCategory(attraction.category) === selectedCategory.toUpperCase());
 
   return filtered.map((item) => {
     const realIdx = attractions.indexOf(item);
@@ -1703,12 +1837,32 @@ function renderFilteredList() {
   }).join("");
 }
 
+function groupedCatalogPage(group, title) {
+  if (catalogLoadError) {
+    return `<section class="home-page">${emptyCatalogState()}</section>`;
+  }
+
+  return `<section class="home-page">
+    <div class="attraction-page-header">
+      <a href="#home" class="back-circle-btn" aria-label="Back to home">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </a>
+      <h1>${title}</h1>
+    </div>
+    <div class="attractions-vertical-list">
+      ${renderFilteredList(group)}
+    </div>
+  </section>`;
+}
+
 function touristAttractionsPage() {
   if (typeof catalogLoadError !== "undefined" && catalogLoadError) {
     return `<section class="home-page">${typeof emptyCatalogState === "function" ? emptyCatalogState() : "<p>Error loading catalog</p>"}</section>`;
   }
 
-  const categories = ["ALL", ...new Set(attractions.map(a => cleanCategory(a.category)))];
+  const attractionItems = attractions.filter(
+    (attraction) => getCategoryGroup(attraction.category) === "attractions");
+  const categories = ["ALL", ...new Set(attractionItems.map((attraction) => cleanCategory(attraction.category)))];
   
   const filterButtons = categories.map(cat => 
     `<button class="filter-chip ${selectedCategory === cat ? 'active' : ''}" data-cat="${cat}" onclick="window.filterAttractions('${cat}')">${cat}</button>`
