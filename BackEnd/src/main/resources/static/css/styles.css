@@ -707,11 +707,8 @@ input:focus-visible {
 
 /* Carousel แนวนอนแบบไม่วนลูป (เลื่อนซ้าย-ขวาสุดขอบแล้วหยุด) */
 .home-category-list {
-  display: grid;
-  grid-template-columns: none;
-  grid-auto-rows: 1fr;
-  grid-auto-flow: column;
-  grid-auto-columns: clamp(12.5rem, 76%, 15.5rem); /* จอเล็กโชว์ 1 ใบเต็ม + แง้มใบถัดไปให้รู้ว่าปัดเลื่อนได้ */
+  display: flex;
+  align-items: stretch;
   gap: 0.75rem;
   margin-top: 0.9rem;
   padding-bottom: 0.25rem;
@@ -721,6 +718,10 @@ input:focus-visible {
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+}
+
+.home-category-list .attraction-card {
+  flex: 0 0 clamp(12.5rem, 76%, 15.5rem);
 }
 
 .home-category-list::-webkit-scrollbar {
@@ -2770,8 +2771,8 @@ body:has(.privacy-dialog[open]) {
    ========================================== */
 /* หน้าจอกลาง (480px - 699px): Carousel โชว์ ~2.2 ใบ เลื่อนซ้าย-ขวาได้โดยไม่วนลูป */
 @media (min-width: 480px) {
-  .home-category-list {
-    grid-auto-columns: clamp(12.5rem, 44%, 15rem);
+  .home-category-list .attraction-card {
+    flex-basis: clamp(12.5rem, 44%, 15rem);
   }
 }
 
@@ -2786,9 +2787,8 @@ body:has(.privacy-dialog[open]) {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .attraction-list.home-category-list {
-    grid-template-columns: none;
-    grid-auto-columns: calc((100% - 1.5rem) / 3);
+  .home-category-list .attraction-card {
+    flex-basis: calc((100% - 1.5rem) / 3);
   }
 
   .pass-list {

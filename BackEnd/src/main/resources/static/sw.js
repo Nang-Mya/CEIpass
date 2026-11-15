@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "chiang-rai-pass-shell-v10";
+const CACHE_NAME = "chiang-rai-pass-shell-v12";
 const APP_SHELL = [
   "./",
   "./index.html",

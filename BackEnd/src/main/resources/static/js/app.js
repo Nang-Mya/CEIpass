@@ -291,7 +291,20 @@ function renderHomeCatalogSections(query = "") {
     ].join("");
   }
 
+  const categorySearchGroups = {
+    attraction: "attractions",
+    attractions: "attractions",
+    "tourist attraction": "attractions",
+    "tourist attractions": "attractions",
+    restaurant: "restaurants",
+    restaurants: "restaurants",
+    hotel: "hotels",
+    hotels: "hotels"
+  };
+  const categorySearchGroup = categorySearchGroups[normalizedQuery];
   const matches = attractions.filter((place) => {
+    if (categorySearchGroup) return getCategoryGroup(place.category) === categorySearchGroup;
+
     const searchableText = [
       place.publicName || place.name,
       cleanCategory(place.category),
