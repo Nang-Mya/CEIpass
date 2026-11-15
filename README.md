@@ -18,8 +18,6 @@ Chiang Rai Pass is a mobile-first web application for visitors to explore Chiang
 - **6831503093 — Thitaree Panyasao:** Visitor-interface and attraction/pass catalog content updates.
 - **6831503106 — Sirinda Pumsiri:** Account and profile features, email verification and password reset, privacy controls, and authentication/security improvements.
 
-These responsibility areas summarize contributions visible in the repository history. Please confirm them with all members before submission.
-
 ## Features and project requirements
 
 ### Implemented in this prototype
