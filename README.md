@@ -91,6 +91,8 @@ Google/Apple OAuth requires provider credentials and callback configuration. SMT
 ## Project layout
 
 - `pom.xml` — root Maven entry point; `mvn spring-boot:run` and `mvn test` work from this directory.
+- `FrontEnd/` — browser interface, styles, images, manifest, and service worker.
 - `BackEnd/src/main/java` — Spring Boot application and API source.
-- `BackEnd/src/main/resources/static` — frontend, styles, images, manifest, and service worker served by Spring Boot.
-- `BackEnd/pom.xml` — backend-local Maven project configuration, retained for existing workflows.
+- `BackEnd/src/main/resources` — backend configuration and database initialization resources.
+- Both Maven configurations package `FrontEnd/` under the Spring Boot `static/` classpath path, so the backend still serves the frontend without keeping its source files in the backend tree.
+- `BackEnd/pom.xml` — backend Maven project configuration used by CI and deployment workflows.

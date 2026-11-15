@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "BackEnd/**"
+      - "FrontEnd/**"
       - "Database/**"
       - ".github/workflows/ci.yml"
   push:
@@ -11,6 +12,7 @@ on:
       - main
     paths:
       - "BackEnd/**"
+      - "FrontEnd/**"
       - "Database/**"
       - ".github/workflows/ci.yml"
 

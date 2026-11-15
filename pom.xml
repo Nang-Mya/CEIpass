@@ -84,6 +84,10 @@
       <resource>
         <directory>BackEnd/src/main/resources</directory>
       </resource>
+      <resource>
+        <directory>FrontEnd</directory>
+        <targetPath>static</targetPath>
+      </resource>
     </resources>
     <testResources>
       <testResource>
