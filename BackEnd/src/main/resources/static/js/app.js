@@ -610,7 +610,7 @@ async function renderQrPage() {
     if (error.status === 401) {
       if (lastAccount) await clearCachedQr(lastAccount);
       localStorage.removeItem(LAST_QR_ACCOUNT_KEY);
-      appContent.innerHTML = `<section>${pageHeading("Your visits", "My QR pass")}<div class="empty-state"><h2>Sign in required</h2><a class="button button-dark" href="#profile">Go to profile</a></div></section>`;
+      appContent.innerHTML = `<section>${pageHeading("Your visits", "My QR pass")}<div class="empty-state"><h2>Sign in required</h2><a class="button button-dark qr-sign-in-link" href="#profile">Go to profile</a></div></section>`;
       return;
     }
     let cacheErrorMessage = "";

@@ -441,6 +441,10 @@ input:focus-visible {
   font-weight: 500;
 }
 
+.qr-sign-in-link {
+  margin-top: 0.75rem;
+}
+
 .empty-state p {
   max-width: 24rem;
   margin: 0.55rem 0 1.15rem;
