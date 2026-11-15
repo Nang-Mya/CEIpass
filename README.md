@@ -4,11 +4,11 @@ Chiang Rai Pass is a mobile-first web application for visitors to explore Chiang
 
 ## GROUP MEMBERS
 
-6831503079  Suphanee Muelae
-6831503085  Nang Thanthar Aye Mya
-6831503090  Kunyakorn Klin-eam
-6831503093  Thitaree Panyasao
-6831503106  Sirinda Pumsiri
+- 6831503079  Suphanee Muelae
+- 6831503085  Nang Thanthar Aye Mya
+- 6831503090  Kunyakorn Klin-eam
+- 6831503093  Thitaree Panyasao
+- 6831503106  Sirinda Pumsiri
 
 ## Member responsibilities
 
