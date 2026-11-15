@@ -53,6 +53,8 @@ app:
   auth:
     frontend-url: ${FRONTEND_URL:http://localhost:8080}
     registration-enabled: true
+  demo:
+    account-password: ${DEMO_ACCOUNT_PASSWORD:}
   privacy:
     notice-version: ${PRIVACY_NOTICE_VERSION:v1.0}
     notice-url: ${PRIVACY_NOTICE_URL:https://example.com/privacy}

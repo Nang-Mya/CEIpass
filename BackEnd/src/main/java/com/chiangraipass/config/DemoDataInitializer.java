@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,8 +30,13 @@ public class DemoDataInitializer {
             PassCatalogJpaRepository passRepository,
             PaymentJpaRepository paymentRepository,
             UserPassJpaRepository userPassRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            @Value("${app.demo.account-password:}") String demoAccountPassword) {
         return args -> {
+            if (demoAccountPassword.isBlank()) {
+                return;
+            }
+
             UUID demoId1 = UUID.fromString("11111111-1111-1111-1111-111111111111");
             String demoEmail1 = "demo@ceipass.com";
             // Create a demo account if it doesn't exist
@@ -39,7 +45,7 @@ public class DemoDataInitializer {
                         demoId1,
                         demoEmail1,
                         "Demo Visitor",
-                        passwordEncoder.encode("password123456"),
+                        passwordEncoder.encode(demoAccountPassword),
                         "v1.0"
                 );
             }

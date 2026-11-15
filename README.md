@@ -1,56 +1,96 @@
 # Chiang Rai Pass
 
-Chiang Rai Pass is a planned mobile-first web application for tourists. Its key goals are to display each pass's unique QR code quickly, remain useful when connectivity is unstable, process payments reliably, and prevent QR redemption fraud.
+Chiang Rai Pass is a mobile-first web application for visitors to explore Chiang Rai attractions and pass options. It combines an installable web interface with a Spring Boot API for visitor accounts, pass information, QR codes, and usage history. The project is a working academic prototype: the catalog and account features are available locally, while payment processing and venue-side pass redemption are not integrated with live providers.
 
-> **Project status:** The repository contains a mobile-first visitor UI and a Spring Boot backend foundation. Email/password authentication and public catalog endpoints are implemented. OAuth requires provider credentials. The frontend still uses sample catalog/cart data; payment, order history, and venue redemption are not implemented. The backend defaults to an in-memory H2 database, so it is for local development/testing—not persistent production data. The Cloud Run pipeline currently serves only a static frontend preview.
+## GROUP MEMBERS
 
-## Product and architecture goals
+6831503079  Suphanee Muelae
+6831503085  Nang Thanthar Aye Mya
+6831503090  Kunyakorn Klin-eam
+6831503093  Thitaree Panyasao
+6831503106  Sirinda Pumsiri
 
-- Display the visitor's current QR code in under one second for the agreed measurement conditions.
-- Provide a useful offline experience without implying that an unverified payment or redemption succeeded.
-- Integrate payment providers such as PromptPay through trusted server-side flows.
-- Process payment webhooks securely, durably, and idempotently.
-- Prevent multiple successful redemptions of the same QR code, including simultaneous scans.
-- Maintain auditable transactions and partner revenue splits.
+## Member responsibilities
 
-## Documentation
+- **6831503079 — Suphanee Muelae:** Attraction/catalog data, home search and restaurant/hotel browsing, and pass-history and usage-summary features.
+- **6831503085 — Nang Thanthar Aye Mya:** Pass purchase/checkout interface, sign-in flow integration, and unique QR pass behavior.
+- **6831503090 — Kunyakorn Klin-eam:** Visitor-interface layout and styling, attraction-card presentation, and PWA/offline app-shell behavior.
+- **6831503093 — Thitaree Panyasao:** Visitor-interface and attraction/pass catalog content updates.
+- **6831503106 — Sirinda Pumsiri:** Account and profile features, email verification and password reset, privacy controls, and authentication/security improvements.
 
-- [Architecture blueprint](docs/architecture.md): current stack and package layout, logical components, security and consistency requirements, and decisions still to make.
-- [Backend package structure](structure.md): feature-oriented Java packages and matching test layout.
-- [Development workflow](docs/development-workflow.md): branch naming, pull request expectations, and a phased implementation sequence.
-- [Visitor app feature](docs/visitor-app-feature.md): five-screen navigation, current preview behavior, offline QR limits, and the backend contracts needed for live data.
-- [Authentication setup](docs/authentication.md): email/password sessions, Google/Apple OAuth configuration, privacy-notice gating, and production prerequisites.
+These responsibility areas summarize contributions visible in the repository history. Please confirm them with all members before submission.
 
-## Starter stack
+## Features and project requirements
 
-- **Front end:** plain HTML, CSS, and JavaScript in `FrontEnd/`; served as static files during development, with a PWA app-shell cache.
-- **Back end:** Java 21 and Spring Boot 3.5 in `BackEnd/`.
-- **Database:** Spring Data JPA with in-memory H2 by default. Hibernate creates/updates the local schema; Flyway is currently disabled. This is not a persistent production database configuration.
+### Implemented in this prototype
+
+- Mobile-first visitor interface with home, pass browsing, QR, history, profile, restaurant, and hotel sections.
+- Attraction and pass catalog data, with attraction search and local images.
+- Visitor registration and sign-in, profile management, email verification, and password reset flows.
+- Privacy notice and visitor privacy preferences.
+- Pass QR, pass summary, and usage-history API features.
+- PWA manifest and app-shell service worker for limited offline use.
+- H2 in-memory database for local development.
+
+### Not yet production-ready
+
+- Checkout is a prototype; there is no live payment-provider integration or payment webhook processing.
+- Venue-side QR scanning/redemption is not implemented.
+- H2 data is temporary and is lost when the application stops; a persistent production database and migration plan are still needed.
+- OAuth is disabled unless provider credentials and callback configuration are supplied.
+- Email delivery defaults to application logging. Production SMTP requires local environment configuration.
+- Offline mode does not guarantee that a payment or pass redemption has succeeded.
+
+## Requirements
+
+- Java 21 and Maven 3.9 or later.
+- Network access on the first build so Maven can download dependencies.
+- No API keys, provider credentials, or demo password are required for the local default run.
 
 ## Run locally
 
-Prerequisites: Java 21 and Maven 3.9+.
+Run all commands from the repository root.
 
-1. From the repository root, start the backend:
+1. Confirm the installed Java and Maven versions:
 
-   ```powershell
-   mvn -f BackEnd/pom.xml spring-boot:run
+   ```sh
+   java -version
+   mvn -version
    ```
 
-   The default H2 database is created in memory and reset when the application stops. Hibernate manages the schema; no database setup or SQL migration step is required. Check the API at `http://localhost:8080/api/v1/health`.
+2. Start the Spring Boot application:
 
-2. Serve `FrontEnd/` at `http://localhost:8080` with a static-file development server, such as the VS Code Live Server extension. The visitor UI calls the API at `http://localhost:8080`; configure `FrontEnd/js/config.js` if your local API address differs. The five screens and sample catalog/cart work in the browser. Public catalog and authentication endpoints are implemented, but the catalog UI still uses sample data. New registrations remain disabled until a reviewed privacy notice is published and explicitly configured; provider sign-in additionally requires provider credentials. See [Authentication setup](docs/authentication.md). Payment, history, and venue redemption are not implemented.
+   ```sh
+   mvn spring-boot:run
+   ```
 
-3. Run backend tests with `mvn -f BackEnd/pom.xml test`.
+3. Open the application at [http://localhost:8080](http://localhost:8080). The API health endpoint is [http://localhost:8080/api/v1/health](http://localhost:8080/api/v1/health).
 
-## Google Cloud continuous deployment
+4. Stop the application with `Ctrl+C`. The default database is in-memory H2; application data is reset when the process stops.
 
-The root [cloudbuild.yaml](cloudbuild.yaml) runs backend verification, builds the static frontend preview, pushes it to Artifact Registry, and deploys it as a public Cloud Run service. The deployed image is the frontend-only Nginx container; it does not start the Spring Boot API. Requests under `/api/` return an explicit `503`. The backend is not deployed by this pipeline.
+To run the backend test suite:
 
-Before connecting a Cloud Build trigger to `main`:
+```sh
+mvn test
+```
 
-1. Enable the Cloud Build, Cloud Run, and Artifact Registry APIs in the Google Cloud project. Create the Artifact Registry Docker repository named `cei-pass` in `us-central1`, or change `_AR_REPOSITORY` in `cloudbuild.yaml` to match the repository you created.
-2. Grant the Cloud Build service account permission to push images to that repository and deploy Cloud Run services.
-3. Create a Cloud Build repository trigger for pushes to `main` and set `cloudbuild.yaml` as its build configuration. The trigger builds the frontend preview and deploys service `cei-pass`; the build must pass the backend test suite first.
+### Optional local demo account
 
-The Cloud Run URL serves the frontend preview only. Login, catalog, and other API-dependent features remain unavailable there until a persistent production database, backend deployment, and frontend-to-backend routing are implemented and configured. The current backend uses in-memory H2 and must not be deployed as a production data store. Select a production database and migration strategy before enabling persistent production accounts or passes. Registration remains disabled by default; set up and review privacy-notice configuration before enabling it. Google/Apple OAuth also needs provider credentials and the deployed callback URL before it can be enabled.
+No demo login is enabled by default. To seed the local demo account and sample pass, set your own password in the environment when starting the application. Do not commit the value:
+
+```sh
+DEMO_ACCOUNT_PASSWORD='choose-a-local-password' mvn spring-boot:run
+```
+
+The demo account email is `demo@ceipass.com`. The chosen value is only an example placeholder; use a private local value. Do not use this demo account or the in-memory database for production.
+
+### Optional OAuth or email setup
+
+Google/Apple OAuth requires provider credentials and callback configuration. SMTP delivery requires mail settings; without them, the application uses its configured log mode. Set credentials in environment variables rather than source files. See `BackEnd/src/main/resources/application.yml` for supported environment variable names.
+
+## Project layout
+
+- `pom.xml` — root Maven entry point; `mvn spring-boot:run` and `mvn test` work from this directory.
+- `BackEnd/src/main/java` — Spring Boot application and API source.
+- `BackEnd/src/main/resources/static` — frontend, styles, images, manifest, and service worker served by Spring Boot.
+- `BackEnd/pom.xml` — backend-local Maven project configuration, retained for existing workflows.
